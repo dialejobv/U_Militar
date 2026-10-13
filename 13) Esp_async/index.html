@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Simulación interactiva: programa bloqueante, sondeo con ticks_ms y asyncio en un ESP32 con MicroPython.">
+<title>Simulador asyncio ESP32</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+[hidden]{display:none!important}
+/* Layout: banco de laboratorio — barra de modos arriba, hardware | código, analizador lógico a todo el ancho, métricas y consola abajo */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --surface-2:#f5f7fa; --line:#d5dbe3;
+  --fg:#132030; --muted:#5a6878;
+  --accent:#1f5fd0; --accent-soft:#e3ecfb;
+  --warn:#c27a12; --warn-soft:#fbf0dc; --bad:#cc3a3a; --ok:#1d8a5a; --irq:#7a4cc2; --cpu:#3d4b5c;
+  --led-off:#6b3a3a; --led-on:#ff4436; --code-bg:#f7f9fc; --hl:#fff1cf; --hl-run:#dfe9fb;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f151c; --surface:#16202a; --surface-2:#1b2632; --line:#2a3644;
+    --fg:#e4eaf1; --muted:#93a1b1; --accent:#6aa0ff; --accent-soft:#1c2c47;
+    --warn:#e3a13c; --warn-soft:#3a2d16; --bad:#ef6a62; --ok:#4cc38a; --irq:#a98bf0; --cpu:#9fb0c3;
+    --led-off:#4a2525; --led-on:#ff5a4c; --code-bg:#111a23; --hl:#3d3217; --hl-run:#1f3150;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f151c; --surface:#16202a; --surface-2:#1b2632; --line:#2a3644;
+  --fg:#e4eaf1; --muted:#93a1b1; --accent:#6aa0ff; --accent-soft:#1c2c47;
+  --warn:#e3a13c; --warn-soft:#3a2d16; --bad:#ef6a62; --ok:#4cc38a; --irq:#a98bf0; --cpu:#9fb0c3;
+  --led-off:#4a2525; --led-on:#ff5a4c; --code-bg:#111a23; --hl:#3d3217; --hl-run:#1f3150;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:grid;gap:16px}
+h1,h2{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.05rem;font-weight:600;letter-spacing:.02em}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px}
+header p{margin:.25rem 0 0;color:var(--muted);max-width:62ch}
+.chip{font-family:var(--f-mono);font-size:.75rem;padding:.3rem .6rem;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);white-space:nowrap}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.modes{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:3px;gap:3px}
+.modes button{font:600 .9rem var(--f-display);letter-spacing:.02em;border:0;background:transparent;color:var(--muted);padding:.5rem .9rem;border-radius:7px;cursor:pointer}
+.modes button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.modes button:not([aria-pressed="true"]):hover{background:var(--surface-2);color:var(--fg)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:500 .85rem var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:.45rem .8rem;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+select.btn{padding-right:.5rem}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.observe{border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--surface);border-radius:8px;padding:.75rem 1rem;display:grid;gap:.2rem}
+.observe strong{font-family:var(--f-display);font-size:1rem}
+.observe p{margin:0;color:var(--muted);max-width:90ch}
+
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px}
+@media (max-width:900px){.stage{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:12px;align-content:start;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+
+.hw{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.hw{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.part{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:6px;justify-items:center;text-align:center;min-width:0}
+.part .name{font:600 .85rem var(--f-display);letter-spacing:.02em}
+.part .pin{font:500 .7rem var(--f-mono);color:var(--muted)}
+.part .val{font:500 .75rem var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.led{width:34px;height:34px;border-radius:50%;background:var(--led-off);border:2px solid var(--line);transition:background .05s,box-shadow .05s}
+.led.on{background:var(--led-on);box-shadow:0 0 18px 4px color-mix(in srgb,var(--led-on) 60%,transparent)}
+.push{width:64px;height:64px;border-radius:50%;border:3px solid var(--line);background:radial-gradient(circle at 35% 30%,var(--surface),var(--surface-2));box-shadow:0 4px 0 var(--line);cursor:pointer;font:600 .7rem var(--f-mono);color:var(--muted);touch-action:none;user-select:none}
+.push.down{transform:translateY(3px);box-shadow:0 1px 0 var(--line);border-color:var(--bad);color:var(--bad)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.servo svg,.buzz svg{width:100%;max-width:120px;height:auto}
+.buzz .wave{opacity:0;transition:opacity .05s}
+.buzz.on .wave{opacity:1}
+.buzz.on .body{fill:var(--warn)}
+.alarm{font:600 .7rem var(--f-mono);color:var(--bad)}
+
+.status{font:500 .82rem var(--f-mono);padding:.45rem .6rem;border-radius:7px;background:var(--surface-2);border:1px solid var(--line)}
+.status.sleep{background:var(--warn-soft);border-color:var(--warn);color:var(--fg)}
+.status.idle{color:var(--ok)}
+.code{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;font:400 .8rem/1.55 var(--f-mono);overflow:auto;max-height:420px;padding:.4rem 0}
+.ln{display:flex;white-space:pre;padding-right:1rem;min-width:max-content}
+.ln .no{width:2.6rem;flex:none;text-align:right;padding-right:.8rem;color:var(--muted);opacity:.7;user-select:none}
+.ln.run{background:var(--hl-run);box-shadow:inset 3px 0 0 var(--accent)}
+.ln.sleep{background:var(--hl);box-shadow:inset 3px 0 0 var(--warn)}
+.ln.idle{background:transparent;box-shadow:inset 3px 0 0 var(--ok)}
+.kw{color:var(--accent);font-weight:600}
+.cm{color:var(--muted);font-style:italic}
+.st{color:var(--ok)}
+.code.spin{background-image:linear-gradient(180deg,transparent 0%,color-mix(in srgb,var(--accent) 10%,transparent) 50%,transparent 100%);background-size:100% 60px;background-repeat:no-repeat;animation:scan .35s linear infinite}
+@keyframes scan{from{background-position:0 -60px}to{background-position:0 100%}}
+
+.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.metric{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px}
+.metric .k{font:500 .7rem var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.metric .v{font:600 1.5rem var(--f-display);font-variant-numeric:tabular-nums}
+.metric .v.bad{color:var(--bad)} .metric .v.ok{color:var(--ok)}
+.bar{height:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--cpu);width:0}
+
+.tl-wrap{overflow-x:auto}
+canvas#tl{width:100%;min-width:560px;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font:500 .75rem var(--f-mono);color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:10px;border-radius:2px;display:inline-block}
+
+.bottom{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.bottom{grid-template-columns:minmax(0,1fr)}}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem;font-variant-numeric:tabular-nums}
+th,td{padding:.45rem .5rem;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font:500 .7rem var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+tr.cur td{background:var(--accent-soft)}
+.console{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;font:400 .78rem/1.5 var(--f-mono);height:210px;overflow:auto;padding:.5rem .7rem}
+.console div{white-space:pre-wrap}
+.console .t{color:var(--muted)}
+.console .bad{color:var(--bad)} .console .ok{color:var(--ok)} .console .info{color:var(--accent)}
+.hint{font-size:.8rem;color:var(--muted);margin:0}
+kbd{font:500 .75rem var(--f-mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 .3rem;background:var(--surface-2)}
+@media (prefers-reduced-motion:reduce){.code.spin{animation:none}.led,.buzz .wave{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Programación asincrónica · MicroPython</div>
+      <h1>Simulador asyncio ESP32</h1>
+      <p>El mismo circuito ejecutado con tres estilos de programa. Presiona el botón, mueve el potenciómetro y la temperatura, y compara cómo responde cada uno.</p>
+    </div>
+    <span class="chip" id="clock">t = 0.000 s</span>
+  </header>
+
+  <div class="toolbar">
+    <div class="modes" role="group" aria-label="Estilo de programa">
+      <button id="m-bloq" data-mode="bloq" aria-pressed="true">1 · Bloqueante</button>
+      <button id="m-sondeo" data-mode="sondeo" aria-pressed="false">2 · Sondeo (ticks_ms)</button>
+      <button id="m-asyncio" data-mode="asyncio" aria-pressed="false">3 · asyncio</button>
+    </div>
+    <div class="controls">
+      <button class="btn" id="burst">Ráfaga de 5 pulsaciones</button>
+      <button class="btn" id="pause">Pausar</button>
+      <button class="btn" id="reset">Reiniciar</button>
+      <label class="hint" for="speed">Velocidad</label>
+      <select class="btn" id="speed">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="observe" id="observe"><strong></strong><p></p></div>
+
+  <div class="stage">
+    <section class="panel" aria-labelledby="hw-h">
+      <div class="panel-head"><h2 id="hw-h">Circuito</h2><span class="eyebrow">ESP32 DevKit</span></div>
+      <div class="hw">
+        <div class="part">
+          <div class="name">LED</div><div class="pin">GPIO2</div>
+          <div class="led" id="led" aria-label="LED"></div>
+          <div class="val" id="led-v">apagado</div>
+        </div>
+        <div class="part">
+          <div class="name">Botón</div><div class="pin">GPIO0 · pull-up</div>
+          <button class="push" id="push" aria-label="Botón: mantener presionado">PULSA</button>
+          <div class="val" id="pin-v">pin = 1</div>
+        </div>
+        <div class="part buzz" id="buzz">
+          <div class="name">Buzzer</div><div class="pin">GPIO19 · PWM</div>
+          <svg viewBox="0 0 120 70" aria-hidden="true">
+            <path class="body" d="M30 25 h14 l18 -14 v48 l-18 -14 h-14 z" fill="var(--muted)"/>
+            <path class="wave" d="M72 24 q10 11 0 22" fill="none" stroke="var(--warn)" stroke-width="4" stroke-linecap="round"/>
+            <path class="wave" d="M82 14 q18 21 0 42" fill="none" stroke="var(--warn)" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+          <div class="val" id="buzz-v">silencio</div>
+        </div>
+        <div class="part">
+          <div class="name">Potenciómetro</div><div class="pin">GPIO34 · ADC</div>
+          <input type="range" id="pot" min="0" max="100" value="30" aria-label="Potenciómetro">
+          <div class="val" id="pot-v">read_u16 = 19661</div>
+        </div>
+        <div class="part servo">
+          <div class="name">Servo SG90</div><div class="pin">GPIO18 · 50 Hz</div>
+          <svg viewBox="0 0 120 70" aria-hidden="true">
+            <path d="M12 62 A48 48 0 0 1 108 62" fill="none" stroke="var(--line)" stroke-width="6"/>
+            <line id="servo-target" x1="60" y1="62" x2="108" y2="62" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3" opacity=".6"/>
+            <line id="servo-arm" x1="60" y1="62" x2="104" y2="62" stroke="var(--fg)" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="60" cy="62" r="6" fill="var(--fg)"/>
+          </svg>
+          <div class="val" id="servo-v">0°</div>
+        </div>
+        <div class="part">
+          <div class="name">DHT22</div><div class="pin">GPIO4 · alarma &gt; 30 °C</div>
+          <input type="range" id="temp" min="15" max="40" step="0.5" value="26" aria-label="Temperatura ambiente">
+          <div class="val" id="temp-v">ambiente 26.0 °C</div>
+          <div class="val" id="sensed-v">leída: —</div>
+        </div>
+      </div>
+      <p class="hint">Mantén presionado el botón con el ratón o el dedo, o usa <kbd>Espacio</kbd> con el botón enfocado. Una pulsación real dura entre 80 y 200 ms.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="code-h">
+      <div class="panel-head"><h2 id="code-h">Código en ejecución</h2><span class="eyebrow" id="code-file">main.py</span></div>
+      <div class="status" id="status">—</div>
+      <div class="code" id="code"></div>
+    </section>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><span class="k">Pulsaciones</span><span class="v" id="mt-total">0</span></div>
+    <div class="metric"><span class="k">Detectadas</span><span class="v ok" id="mt-det">0</span></div>
+    <div class="metric"><span class="k">Perdidas</span><span class="v bad" id="mt-lost">0</span></div>
+    <div class="metric"><span class="k">Latencia media</span><span class="v" id="mt-lat">—</span></div>
+    <div class="metric"><span class="k">CPU ocupada (2 s)</span><span class="v" id="mt-cpu">0 %</span><div class="bar"><i id="mt-bar"></i></div></div>
+  </div>
+
+  <section class="panel" aria-labelledby="tl-h">
+    <div class="panel-head"><h2 id="tl-h">Línea de tiempo (últimos 4 s)</h2><span class="eyebrow">analizador lógico</span></div>
+    <div class="tl-wrap"><canvas id="tl" height="200" aria-label="Línea de tiempo de tareas"></canvas></div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>ejecutando código</span>
+      <span><i style="background:var(--warn)"></i>bloqueado en time.sleep()</span>
+      <span><i style="background:var(--bad)"></i>botón presionado (pin = 0)</span>
+      <span><i style="background:var(--irq)"></i>interrupción (IRQ)</span>
+      <span><i style="background:var(--cpu)"></i>CPU trabajando</span>
+    </div>
+  </section>
+
+  <div class="bottom">
+    <section class="panel" aria-labelledby="cmp-h">
+      <div class="panel-head"><h2 id="cmp-h">Comparación de los tres estilos</h2><span class="eyebrow">acumulado por modo</span></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Estilo</th><th>Pulsaciones</th><th>Detectadas</th><th>Perdidas</th><th>Latencia media</th><th>CPU ocupada</th></tr></thead>
+          <tbody id="cmp"></tbody>
+        </table>
+      </div>
+      <p class="hint">Sugerencia para la clase: en cada modo presiona “Ráfaga de 5 pulsaciones” y luego compara las filas.</p>
+    </section>
+    <section class="panel" aria-labelledby="con-h">
+      <div class="panel-head"><h2 id="con-h">Consola serie</h2><span class="eyebrow">115200 baudios</span></div>
+      <div class="console" id="console" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const H = 4000;                     // ms de historia en la línea de tiempo
+  const MODES = {
+    bloq:    { label: "Bloqueante", file: "01_bloqueante.py",
+      title: "Qué observar: el programa se congela en cada time.sleep()",
+      text: "Mientras duerme, nadie revisa el botón: la mayoría de las pulsaciones se pierden y el servo salta solo cada 2 s. La CPU descansa, pero el sistema no responde." },
+    sondeo:  { label: "Sondeo (ticks_ms)", file: "02_no_bloqueante_ticks.py",
+      title: "Qué observar: responde rápido, pero la CPU nunca descansa",
+      text: "Sin sleep(), el bucle pregunta “¿ya es hora?” miles de veces por segundo. Detecta el botón en ~1 ms y el servo sigue al potenciómetro, pero la CPU está ocupada el 100 % del tiempo." },
+    asyncio: { label: "asyncio", file: "05_sensores_actuadores.py",
+      title: "Qué observar: cada tarea despierta solo cuando le toca",
+      text: "Las corrutinas esperan con await y el planificador ejecuta a la que está lista. El botón se atiende por interrupción en ~20 ms (antirrebote), el servo es fluido y la CPU queda libre casi todo el tiempo." }
+  };
+  const CODE = {
+    bloq: [
+      ["", "while True:"],
+      ["led1", "    led.value(1)"],
+      ["s1", "    time.sleep(1)          # bloquea 1 s"],
+      ["led0", "    led.value(0)"],
+      ["s2", "    time.sleep(1)          # bloquea 1 s"],
+      ["btn", "    if boton.value() == 0:"],
+      ["btn", "        print(\"Botón detectado\")"],
+      ["servo", "    servo.mover(leer_pot())"],
+      ["dht", "    temp = dht.medir()     # ~25 ms"],
+      ["buz", "    buzzer.value(temp > 30)"]
+    ],
+    sondeo: [
+      ["loop", "while True:"],
+      ["", "    ahora = time.ticks_ms()"],
+      ["led", "    if ticks_diff(ahora, t_led) >= 1000:"],
+      ["led", "        led.value(not led.value()); t_led = ahora"],
+      ["btn", "    b = boton.value()"],
+      ["btn", "    if b_antes == 1 and b == 0: print(\"Botón\")"],
+      ["", "    b_antes = b"],
+      ["servo", "    if ticks_diff(ahora, t_servo) >= 50:"],
+      ["servo", "        servo.mover(leer_pot()); t_servo = ahora"],
+      ["dht", "    if ticks_diff(ahora, t_dht) >= 2000:"],
+      ["dht", "        temp = dht.medir(); t_dht = ahora   # ~25 ms"],
+      ["buz", "    buzzer.value(temp > 30)"]
+    ],
+    asyncio: [
+      ["irq", "def irq_boton(pin): bandera.set()     # interrupción"],
+      ["", ""],
+      ["", "async def atender_boton():"],
+      ["", "    while True:"],
+      ["a_wait", "        await bandera.wait()"],
+      ["a_chk", "        await asyncio.sleep_ms(20)    # antirrebote"],
+      ["a_chk", "        if boton.value() == 0: evento.set()"],
+      ["", ""],
+      ["", "async def tarea_servo():"],
+      ["", "    while True:"],
+      ["a_servo", "        servo.mover(leer_pot())"],
+      ["", "        await asyncio.sleep_ms(50)"],
+      ["", ""],
+      ["", "async def tarea_dht():"],
+      ["", "    while True:"],
+      ["a_dht", "        temp = dht.medir()        # ~25 ms"],
+      ["", "        await asyncio.sleep(2)"],
+      ["", ""],
+      ["", "async def tarea_alarma():"],
+      ["", "    while True:"],
+      ["a_alarma", "        buzzer.alternar() if temp > 30 else buzzer.apagar()"],
+      ["", "        await asyncio.sleep_ms(200)"],
+      ["", ""],
+      ["", "async def tarea_latido():"],
+      ["", "    while True:"],
+      ["a_latido", "        led.alternar()"],
+      ["", "        await asyncio.sleep(1)"],
+      ["", ""],
+      ["", "# main() reúne las 5 tareas con asyncio.gather(...)"],
+      ["a_loop", "asyncio.run(main())   # planificador (event loop)"]
+    ]
+  };
+  const LANES = {
+    bloq:    [["pin","Botón GPIO0"],["main","loop principal"],["cpu","CPU"]],
+    sondeo:  [["pin","Botón GPIO0"],["main","loop principal"],["cpu","CPU"]],
+    asyncio: [["pin","Botón GPIO0"],["irq","IRQ botón"],["boton","atender_boton"],["servo","tarea_servo"],["dht","tarea_dht"],["alarma","tarea_alarma"],["latido","tarea_latido"],["cpu","CPU"]]
+  };
+
+  // ---------- estado ----------
+  let mode = "bloq", t = 0, running = true, speed = 1, acc = 0, lastFrame = null;
+  const hw = { pinLow:false, led:0, pot:30, temp:26, sensed:null, servoTarget:0, servoAngle:0, buzzer:false };
+  let presses = [], queue = [];
+  const mkStats = () => ({ total:0, det:0, lost:0, latSum:0, busy:0, ms:0 });
+  let stats = { bloq:mkStats(), sondeo:mkStats(), asyncio:mkStats() };
+  let lanes, laneIdx, hist, engine, hl = { key:null, kind:"run" }, statusText = "";
+  let cpuWin = new Uint8Array(2000), cpuSum = 0;
+
+  const $ = id => document.getElementById(id);
+  const fmtT = ms => (ms/1000).toFixed(3);
+  const fmtLat = (sum, n) => { const v = sum / n; return v < 1 ? "< 1 ms" : `${Math.round(v)} ms`; };
+
+  // ---------- consola ----------
+  const con = $("console");
+  function log(msg, cls = "") {
+    const d = document.createElement("div");
+    d.innerHTML = `<span class="t">[${fmtT(t)} s]</span> <span class="${cls}"></span>`;
+    d.lastChild.textContent = msg;
+    con.appendChild(d);
+    while (con.children.length > 80) con.removeChild(con.firstChild);
+    con.scrollTop = con.scrollHeight;
+  }
+
+  // ---------- historia ----------
+  function mark(lane, kind) { const i = laneIdx[lane]; if (i !== undefined) hist[i*H + (t % H)] = kind; }
+
+  // ---------- acciones compartidas ----------
+  function writeServo() { hw.servoTarget = Math.round(hw.pot * 1.8); }
+  function readDht() {
+    const prev = hw.sensed; hw.sensed = hw.temp;
+    if (prev !== hw.sensed) log(`DHT22: ${hw.sensed.toFixed(1)} °C${hw.sensed > 30 ? "  (supera 30 °C)" : ""}`, "info");
+  }
+  function detect() {
+    const p = presses[presses.length - 1];
+    if (!p || p.detected || p.lost || p.released) return;
+    p.detected = true;
+    const lat = t - p.t, s = stats[mode];
+    s.det++; s.latSum += lat;
+    log(`Botón detectado · latencia ${lat < 1 ? "< 1" : lat} ms`, "ok");
+  }
+
+  // ---------- motores de cada estilo ----------
+  function makeBloq() {
+    const steps = [
+      { k:"led1", dur:1, fx(){ hw.led = 1; } },
+      { k:"s1", dur:1000, sleep:true },
+      { k:"led0", dur:1, fx(){ hw.led = 0; } },
+      { k:"s2", dur:1000, sleep:true },
+      { k:"btn", dur:1, fx(){ if (hw.pinLow) detect(); } },
+      { k:"servo", dur:2, fx(){ writeServo(); } },
+      { k:"dht", dur:25, fx(){ readDht(); } },
+      { k:"buz", dur:1, fx(){ hw.buzzer = hw.sensed !== null && hw.sensed > 30; } }
+    ];
+    let pc = 0, until = 0, cur = steps[0];
+    return { tick() {
+      if (t >= until) { cur = steps[pc]; pc = (pc + 1) % steps.length; cur.fx && cur.fx(); until = t + cur.dur; }
+      hl = { key:cur.k, kind: cur.sleep ? "sleep" : "run" };
+      statusText = cur.sleep ? "⏸ Bloqueado en time.sleep(1): nadie revisa el botón ni el potenciómetro" : "▶ Ejecutando instrucciones del bucle";
+      mark("main", cur.sleep ? 2 : 1);
+      return !cur.sleep;
+    }};
+  }
+
+  function makeSondeo() {
+    let tLed = 0, tServo = -50, tDht = -2000, bPrev = false, until = 0, lastKey = "loop", lastKeyT = -9999;
+    const act = k => { lastKey = k; lastKeyT = t; };
+    return { tick() {
+      if (t < until) { mark("main", 1); hl = { key:"dht", kind:"run" }; statusText = "▶ Leyendo el DHT22 (25 ms)"; return true; }
+      if (t - tLed >= 1000) { hw.led ^= 1; tLed = t; act("led"); }
+      const b = hw.pinLow;
+      if (b && !bPrev) { detect(); act("btn"); }
+      bPrev = b;
+      if (t - tServo >= 50) { writeServo(); tServo = t; }
+      if (t - tDht >= 2000) { readDht(); tDht = t; until = t + 25; act("dht"); }
+      hw.buzzer = hw.sensed !== null && hw.sensed > 30;
+      mark("main", 1);
+      hl = (t - lastKeyT < 250) ? { key:lastKey, kind:"run" } : { key:"loop", kind:"run" };
+      statusText = "▶ Girando en el bucle sin parar: la CPU pregunta todo el tiempo";
+      return true;
+    }};
+  }
+
+  function makeAsync() {
+    let flag = false, irqPending = false, busyUntil = 0, cur = null, curK = null;
+    const tasks = [
+      { id:"boton", wake:Infinity, waitFlag:true, phase:"wait", run() {
+          if (this.phase === "wait") { this.phase = "deb"; this.waitFlag = false; this.wake = t + 1 + 20; return { dur:1, k:"a_wait" }; }
+          if (hw.pinLow) detect();
+          this.phase = "wait"; this.waitFlag = true; this.wake = Infinity; return { dur:1, k:"a_chk" };
+      }},
+      { id:"servo", wake:0, run() { writeServo(); this.wake = t + 1 + 50; return { dur:1, k:"a_servo" }; } },
+      { id:"dht", wake:0, run() { readDht(); this.wake = t + 25 + 2000; return { dur:25, k:"a_dht" }; } },
+      { id:"alarma", wake:0, run() {
+          if (hw.sensed !== null && hw.sensed > 30) hw.buzzer = !hw.buzzer; else hw.buzzer = false;
+          this.wake = t + 1 + 200; return { dur:1, k:"a_alarma" }; } },
+      { id:"latido", wake:0, run() { hw.led ^= 1; this.wake = t + 1 + 1000; return { dur:1, k:"a_latido" }; } }
+    ];
+    return {
+      irq() { flag = true; irqPending = true; },
+      tick() {
+        if (irqPending) { mark("irq", 4); irqPending = false; }
+        if (t < busyUntil) { mark(cur.id, 1); hl = { key:curK, kind:"run" }; statusText = `▶ Ejecutando ${taskName(cur.id)}`; return true; }
+        const bt = tasks[0];
+        if (bt.waitFlag && flag) { flag = false; bt.wake = t; }
+        let best = null;
+        for (const k of tasks) if (k.wake <= t && (!best || k.wake < best.wake)) best = k;
+        if (!best) { hl = { key:"a_loop", kind:"idle" }; statusText = "○ Planificador en espera: ninguna tarea está lista"; return false; }
+        const r = best.run(); cur = best; curK = r.k; busyUntil = t + r.dur;
+        mark(best.id, 1); hl = { key:curK, kind:"run" }; statusText = `▶ Ejecutando ${taskName(best.id)}`;
+        return true;
+      }
+    };
+  }
+  const taskName = id => ({ boton:"atender_boton()", servo:"tarea_servo()", dht:"tarea_dht()", alarma:"tarea_alarma()", latido:"tarea_latido()" })[id];
+
+  // ---------- botón ----------
+  function pressDown() {
+    if (hw.pinLow) return;
+    hw.pinLow = true;
+    presses.push({ t, released:false, detected:false, lost:false, relT:0 });
+    stats[mode].total++;
+    if (engine.irq) engine.irq();
+    $("push").classList.add("down");
+  }
+  function pressUp() {
+    if (!hw.pinLow) return;
+    hw.pinLow = false;
+    const p = presses[presses.length - 1]; if (p) { p.released = true; p.relT = t; }
+    $("push").classList.remove("down");
+  }
+
+  // ---------- un milisegundo de simulación ----------
+  function tick() {
+    while (queue.length && queue[0].at <= t) { const e = queue.shift(); e.type === "down" ? pressDown() : pressUp(); }
+    const row = t % H;
+    for (let i = 0; i < lanes.length; i++) hist[i*H + row] = 0;
+    if (hw.pinLow) mark("pin", 3);
+    const busy = engine.tick();
+    if (busy) mark("cpu", 5);
+    const w = t % 2000; cpuSum += (busy ? 1 : 0) - cpuWin[w]; cpuWin[w] = busy ? 1 : 0;
+    const s = stats[mode]; s.ms++; if (busy) s.busy++;
+    for (const p of presses) {
+      if (p.released && !p.detected && !p.lost && t - p.relT > 30) {
+        p.lost = true; s.lost++; log("Pulsación perdida: el programa nunca la vio", "bad");
+      }
+    }
+    if (presses.length > 20) presses = presses.filter(p => !(p.detected || p.lost) || t - p.t < 5000);
+    const d = hw.servoTarget - hw.servoAngle;               // el servo gira ~0.5°/ms
+    hw.servoAngle += Math.abs(d) < 0.5 ? d : Math.sign(d) * 0.5;
+    t++;
+  }
+
+  // ---------- modo ----------
+  function setMode(m) {
+    if (hw.pinLow) pressUp();
+    queue = [];
+    mode = m;
+    lanes = LANES[m]; laneIdx = {}; lanes.forEach(([id], i) => laneIdx[id] = i);
+    hist = new Uint8Array(lanes.length * H);
+    cpuWin = new Uint8Array(2000); cpuSum = 0;
+    presses = [];
+    engine = m === "bloq" ? makeBloq() : m === "sondeo" ? makeSondeo() : makeAsync();
+    document.querySelectorAll(".modes button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+    const info = MODES[m];
+    $("observe").querySelector("strong").textContent = info.title;
+    $("observe").querySelector("p").textContent = info.text;
+    $("code-file").textContent = info.file;
+    renderCode();
+    sizeCanvas();
+    log(`— Programa cargado: ${info.label} —`, "info");
+  }
+
+  // ---------- código ----------
+  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function tint(line) {
+    let code = line, cm = "";
+    const i = line.indexOf("#");
+    if (i >= 0) { code = line.slice(0, i); cm = line.slice(i); }
+    let h = esc(code)
+      .replace(/(".*?")/g, '<span class="st">$1</span>')
+      .replace(/\b(async|await|def|while|True|if|else|and|not|import)\b/g, '<span class="kw">$1</span>');
+    if (cm) h += `<span class="cm">${esc(cm)}</span>`;
+    return h;
+  }
+  let codeLines = [], prevHl = "";
+  function renderCode() {
+    const box = $("code"); box.innerHTML = "";
+    codeLines = CODE[mode].map(([k, txt], i) => {
+      const d = document.createElement("div");
+      d.className = "ln"; d.dataset.k = k;
+      d.innerHTML = `<span class="no">${i + 1}</span><span>${tint(txt) || " "}</span>`;
+      box.appendChild(d); return d;
+    });
+    box.classList.toggle("spin", mode === "sondeo" && running);
+    prevHl = "";
+  }
+  function updateCode() {
+    const sig = hl.key + "|" + hl.kind;
+    if (sig === prevHl) return;
+    prevHl = sig;
+    let first = null;
+    for (const d of codeLines) {
+      const on = hl.key && d.dataset.k === hl.key;
+      d.classList.toggle("run", on && hl.kind === "run");
+      d.classList.toggle("sleep", on && hl.kind === "sleep");
+      d.classList.toggle("idle", on && hl.kind === "idle");
+      if (on && !first) first = d;
+    }
+    if (first) {
+      const box = $("code"), top = first.offsetTop - box.offsetTop;
+      if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 40) box.scrollTop = top - 60;
+    }
+  }
+
+  // ---------- línea de tiempo ----------
+  const cv = $("tl"), ctx = cv.getContext("2d");
+  const LANE_H = 22, TOP = 6, AXIS = 22, LABEL_W = 112;
+  function sizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 600, h = TOP + lanes.length * LANE_H + AXIS;
+    cv.style.height = h + "px";
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", sizeCanvas);
+  function drawTimeline() {
+    const cs = getComputedStyle(document.documentElement);
+    const col = n => cs.getPropertyValue(n).trim();
+    const C = { 1:col("--accent"), 2:col("--warn"), 3:col("--bad"), 4:col("--irq"), 5:col("--cpu") };
+    const w = cv.clientWidth, h = TOP + lanes.length * LANE_H + AXIS, plotW = w - LABEL_W - 8;
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = `500 11px ${col("--f-mono")}`;
+    ctx.textBaseline = "middle";
+    const t0 = t - H;
+    lanes.forEach(([id, name], li) => {
+      const y = TOP + li * LANE_H;
+      ctx.fillStyle = col("--surface-2"); ctx.fillRect(LABEL_W, y + 3, plotW, LANE_H - 6);
+      ctx.fillStyle = col("--muted"); ctx.fillText(name, 4, y + LANE_H / 2);
+      const base = li * H;
+      for (let px = 0; px < plotW; px++) {
+        const a = Math.floor(px * H / plotW), b = Math.max(a + 1, Math.floor((px + 1) * H / plotW));
+        let k = 0;
+        for (let m = a; m < b; m++) {
+          const abs = t0 + m; if (abs < 0) continue;
+          const v = hist[base + (abs % H)];
+          if (v > k) k = v;
+          if (v === 2 && k < 2) k = 2;
+        }
+        if (k) { ctx.fillStyle = C[k]; ctx.fillRect(LABEL_W + px, y + 4, 1.2, LANE_H - 8); }
+      }
+    });
+    const yA = TOP + lanes.length * LANE_H + 4;
+    ctx.strokeStyle = col("--line"); ctx.beginPath(); ctx.moveTo(LABEL_W, yA); ctx.lineTo(LABEL_W + plotW, yA); ctx.stroke();
+    ctx.fillStyle = col("--muted"); ctx.textBaseline = "top"; ctx.textAlign = "center";
+    const first = Math.ceil(Math.max(t0, 0) / 500) * 500;
+    for (let m = first; m <= t; m += 500) {
+      const x = LABEL_W + (m - t0) * plotW / H;
+      ctx.strokeStyle = col("--line"); ctx.beginPath(); ctx.moveTo(x, yA); ctx.lineTo(x, yA + (m % 1000 ? 3 : 6)); ctx.stroke();
+      if (m % 1000 === 0 && x > LABEL_W + 12 && x < LABEL_W + plotW - 12) ctx.fillText(`${m / 1000} s`, x, yA + 7);
+    }
+    ctx.textAlign = "left";
+  }
+
+  // ---------- render ----------
+  function render() {
+    $("clock").textContent = `t = ${fmtT(t)} s`;
+    $("led").classList.toggle("on", !!hw.led);
+    $("led-v").textContent = hw.led ? "encendido" : "apagado";
+    $("pin-v").textContent = `pin = ${hw.pinLow ? 0 : 1}`;
+    $("buzz").classList.toggle("on", hw.buzzer);
+    $("buzz-v").textContent = hw.buzzer ? "sonando" : (hw.sensed !== null && hw.sensed > 30 ? "alarma activa" : "silencio");
+    $("pot-v").textContent = `read_u16 = ${Math.round(hw.pot * 655.35)}`;
+    const ang = hw.servoAngle - 180, tang = hw.servoTarget - 180;
+    $("servo-arm").setAttribute("transform", `rotate(${ang} 60 62)`);
+    $("servo-target").setAttribute("transform", `rotate(${(Math.round(hw.pot * 1.8)) - 180} 60 62)`);
+    $("servo-v").textContent = `${Math.round(hw.servoAngle)}° (pot pide ${Math.round(hw.pot * 1.8)}°)`;
+    $("temp-v").textContent = `ambiente ${hw.temp.toFixed(1)} °C`;
+    $("sensed-v").textContent = `leída: ${hw.sensed === null ? "—" : hw.sensed.toFixed(1) + " °C"}`;
+    const st = $("status");
+    st.textContent = running ? statusText : "Simulación en pausa";
+    st.className = "status" + (hl.kind === "sleep" ? " sleep" : hl.kind === "idle" ? " idle" : "");
+    updateCode();
+    const s = stats[mode];
+    $("mt-total").textContent = s.total;
+    $("mt-det").textContent = s.det;
+    $("mt-lost").textContent = s.lost;
+    $("mt-lat").textContent = s.det ? fmtLat(s.latSum, s.det) : "—";
+    const win = Math.min(t, 2000) || 1, pct = Math.round(cpuSum / win * 100);
+    $("mt-cpu").textContent = `${pct} %`;
+    $("mt-bar").style.width = pct + "%";
+    const rows = Object.keys(MODES).map(m => {
+      const x = stats[m];
+      const lat = x.det ? fmtLat(x.latSum, x.det) : "—";
+      const cpu = x.ms ? `${Math.round(x.busy / x.ms * 100)} %` : "—";
+      return `<tr class="${m === mode ? "cur" : ""}"><td>${MODES[m].label}</td><td>${x.total}</td><td>${x.det}</td><td>${x.lost}</td><td>${lat}</td><td>${cpu}</td></tr>`;
+    }).join("");
+    const tb = $("cmp"); if (tb.innerHTML !== rows) tb.innerHTML = rows;
+    drawTimeline();
+  }
+
+  function frame(now) {
+    if (lastFrame === null) lastFrame = now;
+    const dt = Math.min(now - lastFrame, 100); lastFrame = now;
+    if (running) { acc += dt * speed; while (acc >= 1) { tick(); acc -= 1; } }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- eventos de la interfaz ----------
+  document.querySelectorAll(".modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  const push = $("push");
+  push.addEventListener("pointerdown", e => { e.preventDefault(); push.setPointerCapture?.(e.pointerId); pressDown(); });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(ev => push.addEventListener(ev, pressUp));
+  push.addEventListener("keydown", e => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); pressDown(); } });
+  push.addEventListener("keyup", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); pressUp(); } });
+  $("pot").addEventListener("input", e => hw.pot = +e.target.value);
+  $("temp").addEventListener("input", e => hw.temp = +e.target.value);
+  $("speed").addEventListener("change", e => speed = +e.target.value);
+  $("pause").addEventListener("click", () => {
+    running = !running; $("pause").textContent = running ? "Pausar" : "Continuar";
+    $("code").classList.toggle("spin", mode === "sondeo" && running);
+  });
+  $("reset").addEventListener("click", () => {
+    t = 0; acc = 0; stats = { bloq:mkStats(), sondeo:mkStats(), asyncio:mkStats() };
+    Object.assign(hw, { led:0, sensed:null, servoTarget:0, servoAngle:0, buzzer:false });
+    con.innerHTML = ""; setMode(mode);
+  });
+  $("burst").addEventListener("click", () => {
+    let at = t + 150;
+    for (let i = 0; i < 5; i++) {
+      const hold = 100 + Math.round(Math.random() * 60);
+      queue.push({ at, type:"down" }, { at: at + hold, type:"up" });
+      at += hold + 250 + Math.round(Math.random() * 350);
+    }
+    queue.sort((a, b) => a.at - b.at);
+    log("Ráfaga: 5 pulsaciones de 100–160 ms", "info");
+  });
+
+  setMode("bloq");
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
