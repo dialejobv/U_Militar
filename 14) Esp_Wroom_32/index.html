@@ -1,0 +1,2476 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Laboratorio ESP32-WROOM-32</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: banda de cabecera tipo serigrafía de PCB + pestañas de módulo + paneles de laboratorio en rejilla */
+:root{
+  --bg:#eef2ef; --panel:#fbfcfb; --ink:#14201b; --muted:#56655e; --line:#cfd8d2; --soft:#e3eae5;
+  --hdr-bg:#0e5a49; --hdr-ink:#e8f5ef; --hdr-muted:#a9d3c4;
+  --pcb:#0e6a55; --copper:#a5611c; --gold:#b98a24;
+  --ok:#2b8549; --warn:#a8700a; --bad:#bb3826; --info:#2463a6; --vio:#7449aa;
+  --f-disp:"Saira Semi Condensed","Arial Narrow",sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1412; --panel:#131c19; --ink:#e2eae6; --muted:#98a7a0; --line:#2a3832; --soft:#1a2521;
+  --hdr-bg:#10342b; --hdr-ink:#dcf0e8; --hdr-muted:#86b3a3;
+  --pcb:#3cb995; --copper:#e39a52; --gold:#e3bb5f;
+  --ok:#4cc072; --warn:#e7ab3c; --bad:#f06c54; --info:#62a7ee; --vio:#b18ae8; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0d1412; --panel:#131c19; --ink:#e2eae6; --muted:#98a7a0; --line:#2a3832; --soft:#1a2521;
+  --hdr-bg:#10342b; --hdr-ink:#dcf0e8; --hdr-muted:#86b3a3;
+  --pcb:#3cb995; --copper:#e39a52; --gold:#e3bb5f;
+  --ok:#4cc072; --warn:#e7ab3c; --bad:#f06c54; --info:#62a7ee; --vio:#b18ae8; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--hdr-bg)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3,h4{font-family:var(--f-disp);line-height:1.15;text-wrap:balance;margin:0}
+h2{font-size:clamp(1.6rem,3vw,2.15rem);font-weight:700}
+h3{font-size:1.2rem;font-weight:600}
+h4{font-size:1rem;font-weight:600;letter-spacing:.02em}
+p{margin:0}
+code,pre,.mono{font-family:var(--f-mono)}
+a{color:var(--info)}
+
+/* cabecera */
+.top{background:var(--hdr-bg);color:var(--hdr-ink);position:relative;overflow:hidden}
+.top .wrap{padding-block:26px 22px;display:grid;gap:14px;position:relative}
+.top canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.35;pointer-events:none}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--hdr-muted)}
+.top h1{font-size:clamp(2.2rem,6vw,3.9rem);font-weight:700;letter-spacing:.01em}
+.top h1 span{color:var(--gold)}
+.top p.lead{max-width:68ch;color:var(--hdr-ink);opacity:.92}
+.specstrip{display:flex;flex-wrap:wrap;gap:6px}
+.specstrip span{font-family:var(--f-mono);font-size:.74rem;border:1px solid color-mix(in srgb,var(--hdr-ink) 30%,transparent);padding:3px 8px;border-radius:3px}
+
+/* pestañas */
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--panel);border-bottom:1px solid var(--line)}
+.tabs .wrap{display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin}
+.tab{flex:0 0 auto;border:0;background:none;color:var(--muted);font:600 .9rem var(--f-disp);padding:12px 12px 10px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab b{font-family:var(--f-mono);font-weight:400;font-size:.72rem;margin-right:6px;color:var(--copper)}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--copper)}
+.tab:focus-visible,.btn:focus-visible,.chip:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+
+/* secciones */
+main{padding-block:26px 60px}
+section.mod{display:grid;gap:22px}
+.modhead{display:grid;gap:8px;max-width:80ch}
+.modhead .eyebrow{color:var(--copper)}
+.modhead p{color:var(--muted)}
+.grid{display:grid;gap:16px;align-content:start;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr))}
+.grid.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))}
+.grid.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:12px;align-content:start;min-width:0}
+.card.flat{background:transparent;border-style:dashed}
+.card > p,.card li{color:var(--ink)}
+.note{font-size:.88rem;color:var(--muted)}
+.lab{border-top:3px solid var(--pcb)}
+.lab-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tag{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pcb)}
+ul.clean{margin:0;padding-left:18px;display:grid;gap:4px}
+
+/* controles */
+.ctrls{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.ctl{display:grid;gap:3px;font-size:.85rem;min-width:0}
+.ctl label,.ctl .lbl{color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.ctl output,.val{font-family:var(--f-mono);color:var(--ink);font-size:.8rem}
+input[type=range]{width:100%;accent-color:var(--pcb)}
+select,input[type=text],input[type=number],textarea{font:inherit;font-size:.9rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;width:100%}
+textarea{resize:vertical;min-height:70px}
+.check{display:flex;align-items:center;gap:6px;font-size:.86rem;color:var(--ink)}
+.ctl label.check{justify-content:flex-start;color:var(--ink)}
+.check input{accent-color:var(--pcb)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:600 .85rem var(--f-body);border:1px solid var(--pcb);background:var(--pcb);color:var(--panel);padding:7px 12px;border-radius:4px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--pcb)}
+.btn.warn{background:transparent;border-color:var(--bad);color:var(--bad)}
+.btn.sm{padding:3px 8px;font-size:.76rem}
+.btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.chip{font:600 .76rem var(--f-mono);border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:4px 9px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--soft)}
+.pill{font:600 .7rem var(--f-mono);padding:2px 7px;border-radius:3px;background:var(--soft);color:var(--ink);white-space:nowrap}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.info{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+
+canvas.cv{width:100%;display:block;background:var(--soft);border-radius:4px;border:1px solid var(--line)}
+.readout{font-family:var(--f-mono);font-size:.8rem;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;display:grid;gap:3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.readout b{color:var(--copper);font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+.kv span:nth-child(odd){color:var(--muted)}
+
+pre.code{margin:0;background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:12px;font-size:.76rem;line-height:1.5;overflow-x:auto;max-height:420px;white-space:pre}
+pre.code .c{color:var(--muted)}
+pre.code .k{color:var(--vio)}
+pre.code .s{color:var(--ok)}
+details.code{border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+details.code summary{cursor:pointer;padding:8px 12px;font:600 .85rem var(--f-disp);color:var(--pcb)}
+details.code pre.code{border:0;border-top:1px solid var(--line);border-radius:0}
+
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-disp);font-weight:600;background:var(--soft);white-space:nowrap}
+td.mono,td code{font-size:.78rem}
+tr:last-child td{border-bottom:0}
+
+/* pinout */
+.pinwrap{display:grid;gap:16px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+@media (max-width:860px){.pinwrap{grid-template-columns:1fr}}
+.pinwrap > *,.grid > *,.card > *,section.mod > *{min-width:0}
+[hidden]{display:none!important}
+.svgbox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px}
+.svgbox svg{display:block;width:100%;min-width:430px;height:auto}
+.pad{cursor:pointer;transition:opacity .2s}
+.pad:hover rect{stroke:var(--ink);stroke-width:2}
+.pad.dim{opacity:.18}
+.pad.sel rect{stroke:var(--ink);stroke-width:2.5}
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+
+/* OSI */
+.osi{display:grid;gap:4px}
+.layer{display:grid;grid-template-columns:44px minmax(110px,150px) minmax(0,1fr) minmax(0,1.1fr);gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 10px;transition:background .3s,border-color .3s}
+.layer .n{font:700 1.3rem var(--f-disp);color:var(--copper)}
+.layer .nm{font:600 .92rem var(--f-disp)}
+.layer .impl{font-size:.86rem}
+.layer .impl small{display:block;color:var(--muted);font-size:.78rem}
+.layer .pdu{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end;min-height:22px}
+.layer .pdu span{font:600 .66rem var(--f-mono);padding:3px 5px;border-radius:2px;color:#fff}
+.layer.na{opacity:.55}
+.layer.hot{border-color:var(--copper);background:color-mix(in srgb,var(--copper) 9%,var(--panel))}
+@media (max-width:700px){.layer{grid-template-columns:34px 1fr}.layer .impl,.layer .pdu{grid-column:1/-1}.layer .pdu{justify-content:flex-start}}
+
+/* listas de tareas */
+.tasklist{display:grid;gap:6px}
+.trow{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:.84rem;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+.trow .sw{width:12px;height:12px;border-radius:2px}
+.trow .nm{font-family:var(--f-mono);font-size:.78rem;overflow-wrap:anywhere}
+.serial{font-family:var(--f-mono);font-size:.74rem;background:#0b1210;color:#9fe3b9;border-radius:4px;padding:10px;height:210px;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--line)}
+.serial .er{color:#ff8e7a}.serial .sy{color:#f2c86b}
+
+/* blockchain */
+.chain{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.block{flex:0 0 250px;border:1px solid var(--line);border-top:4px solid var(--ok);border-radius:5px;background:var(--bg);padding:10px;display:grid;gap:6px;font-size:.78rem}
+.block.bad{border-top-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--bg))}
+.block .h{font-family:var(--f-mono);font-size:.68rem;overflow-wrap:anywhere;color:var(--muted)}
+.block .h b{color:var(--ink)}
+.block textarea{min-height:58px;font-family:var(--f-mono);font-size:.72rem}
+.hex{font-family:var(--f-mono);font-size:.74rem;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+
+/* esp mock */
+.espmock{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.espmock > div{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px;text-align:center;font-size:.78rem;display:grid;gap:4px;justify-items:center}
+.led{width:26px;height:26px;border-radius:50%;background:var(--soft);border:2px solid var(--line);transition:background .2s,box-shadow .2s}
+
+/* flujo */
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.82rem}
+.flow span.st{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 9px;font-family:var(--f-mono);font-size:.74rem}
+.flow span.ar{color:var(--copper);font-weight:700}
+
+/* preguntas */
+.qgroup{display:grid;gap:10px}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:grid;gap:8px}
+.q .qh{display:flex;gap:10px;align-items:baseline}
+.q .qn{font:700 1rem var(--f-mono);color:var(--copper)}
+.q details summary{cursor:pointer;font-size:.84rem;color:var(--pcb);font-weight:600}
+.q details ul{margin:6px 0 0;padding-left:18px;font-size:.86rem;color:var(--muted)}
+.q .lvl{font:600 .66rem var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding-block:20px;color:var(--muted);font-size:.84rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="top">
+  <canvas id="hdrCv" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="eyebrow">Laboratorio interactivo · Sistemas embebidos e IoT industrial</span>
+    <h1>ESP32<span>-</span>WROOM<span>-</span>32</h1>
+    <p class="lead">Simulación de pines, señales analógicas, conectividad por capas OSI, interrupciones, FreeRTOS en doble núcleo, contenedores industriales, cifrado y blockchain, asyncio en MicroPython, visión artificial y enjambres de drones de rescate.</p>
+    <div class="specstrip">
+      <span>Xtensa LX6 ×2 · 240 MHz</span><span>520 KB SRAM</span><span>4 MB flash SPI</span><span>Wi-Fi 802.11 b/g/n</span><span>Bluetooth 4.2 BR/EDR + BLE</span><span>18 ADC · 2 DAC · 16 PWM</span>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Módulos del laboratorio">
+  <div class="wrap" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-tab="pines"><b>01</b>Pines</button>
+    <button class="tab" role="tab" data-tab="senales"><b>02</b>ADC · DAC · PWM</button>
+    <button class="tab" role="tab" data-tab="osi"><b>03</b>Modelo OSI</button>
+    <button class="tab" role="tab" data-tab="interrupciones"><b>04</b>Interrupciones</button>
+    <button class="tab" role="tab" data-tab="nucleos"><b>05</b>Hilos y doble núcleo</button>
+    <button class="tab" role="tab" data-tab="docker"><b>06</b>Docker industrial</button>
+    <button class="tab" role="tab" data-tab="cripto"><b>07</b>Cifrado y blockchain</button>
+    <button class="tab" role="tab" data-tab="asyncio"><b>08</b>asyncio</button>
+    <button class="tab" role="tab" data-tab="vision"><b>09</b>Visión: OpenCV · MediaPipe · YOLO</button>
+    <button class="tab" role="tab" data-tab="enjambre"><b>10</b>Enjambres de drones</button>
+    <button class="tab" role="tab" data-tab="preguntas"><b>11</b>Preguntas</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ===================== 01 PINES ===================== -->
+<section class="mod" id="pines" data-panel>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 01 · Hardware</span>
+    <h2>Mapa de pines del módulo ESP32-WROOM-32</h2>
+    <p>Los 38 pads del módulo, numerados como en la hoja de datos de Espressif (más el pad térmico 39 a GND). Toca un pin para ver sus funciones, o filtra por periférico para ver qué pines lo ofrecen.</p>
+  </div>
+  <div class="pinwrap">
+    <div class="svgbox" id="pinSvgBox"></div>
+    <div class="grid" style="grid-template-columns:1fr">
+      <div class="card">
+        <h4>Filtrar por función</h4>
+        <div class="legend" id="pinFilters"></div>
+      </div>
+      <div class="card lab" id="pinDetail"></div>
+    </div>
+  </div>
+  <div class="grid g3">
+    <div class="card">
+      <h3>Recursos del SoC</h3>
+      <div class="kv mono" style="font-size:.8rem">
+        <span>CPU</span><span>2 × Xtensa LX6, hasta 240 MHz + coprocesador ULP</span>
+        <span>Memoria</span><span>520 KB SRAM · 448 KB ROM · 16 KB RTC SRAM</span>
+        <span>Flash</span><span>4 MB SPI (GPIO6–11)</span>
+        <span>ADC</span><span>2 SAR de 12 bits, 18 canales</span>
+        <span>DAC</span><span>2 × 8 bits (GPIO25, 26)</span>
+        <span>PWM</span><span>LEDC 16 canales + 2 MCPWM</span>
+        <span>Touch</span><span>10 sensores capacitivos</span>
+        <span>Buses</span><span>3 UART · 4 SPI · 2 I²C · 2 I²S · TWAI (CAN)</span>
+        <span>Otros</span><span>RMT, contador de pulsos, sensor Hall, SD/SDIO</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Pines que exigen cuidado</h3>
+      <ul class="clean">
+        <li><b>GPIO6–11:</b> conectados a la flash interna. Usarlos cuelga el chip.</li>
+        <li><b>GPIO34–39:</b> solo entrada, sin pull-up ni pull-down internos.</li>
+        <li><b>Strapping (0, 2, 5, 12, 15):</b> su nivel al reset define el modo de arranque. GPIO12 en alto puede poner la flash a 1.8 V y dejar el módulo sin arrancar.</li>
+        <li><b>ADC2:</b> no disponible mientras el Wi-Fi está activo.</li>
+        <li><b>GPIO1/3:</b> UART0, usada para programar y para el monitor serie.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Límites eléctricos</h3>
+      <ul class="clean">
+        <li>Lógica a 3.3 V. Los pines <b>no toleran 5 V</b>.</li>
+        <li>Corriente por pin: hasta ~40 mA (recomendado ≤ 20 mA).</li>
+        <li>Alimentación 3.0–3.6 V; picos de ~500 mA al transmitir por Wi-Fi.</li>
+        <li>Deep sleep: ~10 µA con el temporizador RTC.</li>
+        <li>Solo los pines RTC pueden despertar al chip del deep sleep (ext0/ext1, touch).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 02 SEÑALES ===================== -->
+<section class="mod" id="senales" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 02 · Periféricos analógicos y de temporización</span>
+    <h2>ADC, DAC y PWM</h2>
+    <p>Mueve los controles y observa cómo responde cada periférico, incluidos sus defectos reales: la no linealidad del ADC, la cuantización del DAC de 8 bits y el compromiso entre frecuencia y resolución del PWM.</p>
+  </div>
+
+  <div class="card lab">
+    <div class="lab-title"><h3>ADC SAR de 12 bits</h3><span class="tag">analogRead · machine.ADC</span></div>
+    <div class="ctrls">
+      <div class="ctl"><label for="adcV">Tensión de entrada <output id="adcVo"></output></label><input type="range" id="adcV" min="0" max="3.3" step="0.01" value="1.65"></div>
+      <div class="ctl"><label for="adcAtt">Atenuación</label><select id="adcAtt"><option value="0">0 dB (≈100–950 mV)</option><option value="1">2.5 dB (≈100–1250 mV)</option><option value="2">6 dB (≈150–1750 mV)</option><option value="3" selected>11 dB (≈150–2450 mV útil, hasta ~3.1 V)</option></select></div>
+      <div class="ctl"><label for="adcBits">Resolución</label><select id="adcBits"><option>9</option><option>10</option><option>11</option><option selected>12</option></select></div>
+      <div class="ctl"><label for="adcUnit">Unidad / pin</label><select id="adcUnit"><option value="1">ADC1 · GPIO34</option><option value="2">ADC2 · GPIO4</option></select></div>
+      <div class="ctl"><label for="adcAvg">Promedio de muestras <output id="adcAvgo"></output></label><input type="range" id="adcAvg" min="1" max="64" value="1"></div>
+      <div class="ctl"><span class="lbl">Condiciones</span><label class="check"><input type="checkbox" id="adcWifi"> Wi-Fi activo</label><label class="check"><input type="checkbox" id="adcNoise" checked> Ruido de alimentación</label></div>
+    </div>
+    <div class="grid g2">
+      <canvas class="cv" id="adcCv" style="height:250px"></canvas>
+      <div class="grid" style="grid-template-columns:1fr">
+        <div class="readout" id="adcOut"></div>
+        <pre class="code"><span class="c"># MicroPython</span>
+<span class="k">from</span> machine <span class="k">import</span> ADC, Pin
+adc = ADC(Pin(34))
+adc.atten(ADC.ATTN_11DB)      <span class="c"># rango ≈ 0–3.1 V</span>
+adc.width(ADC.WIDTH_12BIT)    <span class="c"># 0–4095</span>
+mv = adc.read_uv() / 1000     <span class="c"># usa la calibración de eFuse</span>
+
+<span class="c">// Arduino (ESP32 core 3.x)</span>
+analogSetPinAttenuation(34, ADC_11db);
+analogReadResolution(12);
+<span class="k">int</span> mv = analogReadMilliVolts(34);</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card lab">
+      <div class="lab-title"><h3>DAC de 8 bits</h3><span class="tag">GPIO25 · GPIO26</span></div>
+      <div class="ctrls">
+        <div class="ctl"><label for="dacWave">Forma de onda</label><select id="dacWave"><option value="dc">Nivel constante</option><option value="sin" selected>Senoidal</option><option value="tri">Triangular</option><option value="saw">Diente de sierra</option><option value="sq">Cuadrada</option></select></div>
+        <div class="ctl"><label for="dacVal">Amplitud (código) <output id="dacValo"></output></label><input type="range" id="dacVal" min="1" max="255" value="200"></div>
+        <div class="ctl"><label for="dacSps">Muestras por periodo <output id="dacSpso"></output></label><input type="range" id="dacSps" min="4" max="128" value="16"></div>
+        <div class="ctl"><label for="dacFreq">Frecuencia <output id="dacFreqo"></output></label><input type="range" id="dacFreq" min="1" max="4" step="0.01" value="3"></div>
+      </div>
+      <canvas class="cv" id="dacCv" style="height:210px"></canvas>
+      <div class="readout" id="dacOut"></div>
+      <pre class="code"><span class="k">from</span> machine <span class="k">import</span> DAC, Pin
+<span class="k">import</span> math
+dac = DAC(Pin(25))
+tabla = [int(127 + 127*math.sin(2*math.pi*i/32)) <span class="k">for</span> i <span class="k">in</span> range(32)]
+<span class="k">while True</span>:
+    <span class="k">for</span> v <span class="k">in</span> tabla:
+        dac.write(v)          <span class="c"># Vout = 3.3 V · v / 255</span></pre>
+    </div>
+
+    <div class="card lab">
+      <div class="lab-title"><h3>PWM con LEDC</h3><span class="tag">16 canales · 8 temporizadores</span></div>
+      <div class="ctrls">
+        <div class="ctl"><label for="pwmFreq">Frecuencia <output id="pwmFreqo"></output></label><input type="range" id="pwmFreq" min="0" max="7.6" step="0.01" value="3.7"></div>
+        <div class="ctl"><label for="pwmBits">Resolución <output id="pwmBitso"></output></label><input type="range" id="pwmBits" min="1" max="20" value="10"></div>
+        <div class="ctl"><label for="pwmDuty">Ciclo de trabajo <output id="pwmDutyo"></output></label><input type="range" id="pwmDuty" min="0" max="100" step="0.5" value="35"></div>
+        <div class="ctl"><span class="lbl">Atajos</span><div class="row"><button class="btn sm ghost" id="pwmServo">Servo 50 Hz</button><button class="btn sm ghost" id="pwmLedBtn">LED 5 kHz</button><button class="btn sm ghost" id="pwmMotor">Motor 20 kHz</button></div></div>
+      </div>
+      <canvas class="cv" id="pwmCv" style="height:150px"></canvas>
+      <div class="espmock">
+        <div><div class="led" id="pwmLed"></div>LED (brillo medio)</div>
+        <div><svg width="70" height="44" viewBox="0 0 70 44" aria-hidden="true"><path d="M5 40 A30 30 0 0 1 65 40" fill="none" stroke="var(--line)" stroke-width="4"/><line id="pwmNeedle" x1="35" y1="40" x2="35" y2="12" stroke="var(--copper)" stroke-width="3" stroke-linecap="round"/><circle cx="35" cy="40" r="4" fill="var(--ink)"/></svg><span id="pwmServoTxt">servo</span></div>
+        <div><span class="mono" id="pwmVavg" style="font-size:1.1rem">0 V</span>tensión media</div>
+      </div>
+      <div class="readout" id="pwmOut"></div>
+      <pre class="code"><span class="k">from</span> machine <span class="k">import</span> PWM, Pin
+servo = PWM(Pin(18), freq=50)
+servo.duty_ns(1_500_000)      <span class="c"># 1.5 ms → 90°</span>
+led = PWM(Pin(2), freq=5000, duty_u16=32768)</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 03 OSI ===================== -->
+<section class="mod" id="osi" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 03 · Conectividad</span>
+    <h2>Las 7 capas OSI en cada radio del ESP32</h2>
+    <p>Elige una tecnología y envía una lectura de sensor. Verás qué componente del ESP32 resuelve cada capa y cómo se encapsula el dato al bajar por la pila. Las capas atenuadas no existen como tal en esa tecnología.</p>
+  </div>
+  <div class="row" id="osiTech" role="group" aria-label="Tecnología"></div>
+  <div class="grid g2">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h3 id="osiTitle">Wi-Fi</h3><button class="btn" id="osiSend">Enviar "temp=24.5"</button></div>
+      <div class="osi" id="osiStack"></div>
+      <p class="note" id="osiNote"></p>
+    </div>
+    <div class="card">
+      <h3>Topología en funcionamiento</h3>
+      <canvas class="cv" id="osiCv" style="height:300px"></canvas>
+      <div class="readout" id="osiInfo"></div>
+    </div>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th>Parámetro</th><th>Wi-Fi</th><th>Bluetooth clásico</th><th>BLE 4.2</th><th>ESP-NOW</th></tr></thead>
+      <tbody>
+        <tr><td>Estándar</td><td>IEEE 802.11 b/g/n, 2.4 GHz</td><td>BR/EDR</td><td>Bluetooth Low Energy</td><td>Protocolo propietario sobre tramas 802.11 de acción</td></tr>
+        <tr><td>Tasa física</td><td>hasta 150 Mbps (≈20 Mbps TCP real)</td><td>1–3 Mbps</td><td>1 Mbps</td><td>1 Mbps por defecto (modo LR 250/500 kbps)</td></tr>
+        <tr><td>Alcance típico</td><td>50–100 m</td><td>10–30 m</td><td>30–50 m</td><td>100–200 m; con LR más lejos</td></tr>
+        <tr><td>Carga útil</td><td>MTU 1500 B</td><td>RFCOMM ~1 KB</td><td>20 B (ATT MTU 23, ampliable a 512)</td><td>250 B por trama</td></tr>
+        <tr><td>Topología</td><td>STA, AP, STA+AP, malla</td><td>Piconet 1 + 7</td><td>Central / periférico, broadcast</td><td>Punto a punto y broadcast, hasta 20 pares</td></tr>
+        <tr><td>Conexión previa</td><td>Asociación + DHCP (segundos)</td><td>Emparejamiento</td><td>Conexión GAP (ms)</td><td>Ninguna: se envía al MAC del par</td></tr>
+        <tr><td>Consumo al transmitir</td><td>Alto (~160–240 mA)</td><td>Medio (~100 mA)</td><td>Bajo en promedio</td><td>Medio, ráfagas muy cortas</td></tr>
+        <tr><td>Seguridad</td><td>WPA2/WPA3 + TLS (mbedTLS)</td><td>SSP, cifrado E0/AES</td><td>LE Secure Connections (AES-CCM)</td><td>CCMP con claves PMK/LMK</td></tr>
+        <tr><td>Uso típico</td><td>MQTT a la nube, OTA, servidor web</td><td>Audio A2DP, puerto serie SPP</td><td>Sensores portátiles, app móvil</td><td>Redes de sensores, drones, control remoto con baja latencia</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== 04 INTERRUPCIONES ===================== -->
+<section class="mod" id="interrupciones" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 04 · Tiempo real</span>
+    <h2>Interrupciones, rutinas y corrutinas</h2>
+    <p>Una interrupción detiene lo que hace la CPU para ejecutar una rutina de servicio (ISR). Pulsa el botón simulado y compara una ISR ligera, que solo levanta una bandera, con una ISR pesada que bloquea al resto del sistema.</p>
+  </div>
+  <div class="card lab">
+    <div class="lab-title"><h3>Osciloscopio lógico de interrupciones</h3><span class="tag">GPIO0 · timer 0</span></div>
+    <div class="ctrls">
+      <div class="ctl"><label for="isrMode">Estilo de ISR</label><select id="isrMode"><option value="light">Ligera: bandera + cola a una tarea</option><option value="heavy">Pesada: Serial.print + delay dentro de la ISR</option></select></div>
+      <div class="ctl"><span class="lbl">Señal</span><label class="check"><input type="checkbox" id="isrBounce" checked> Rebote mecánico del botón</label><label class="check"><input type="checkbox" id="isrDebounce"> Antirrebote 50 ms</label></div>
+      <div class="ctl"><span class="lbl">Fuentes</span><label class="check"><input type="checkbox" id="isrTimer" checked> Timer periódico cada 250 ms</label></div>
+      <div class="ctl"><span class="lbl">Acción</span><button class="btn" id="isrBtn">Pulsar botón</button></div>
+    </div>
+    <canvas class="cv" id="isrCv" style="height:260px"></canvas>
+    <div class="readout" id="isrStats"></div>
+  </div>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Reglas de una buena ISR</h3>
+      <ul class="clean">
+        <li>Marcarla con <code>IRAM_ATTR</code> para que resida en RAM interna y no dependa de la caché de flash.</li>
+        <li>Ejecutar en microsegundos: leer, guardar y salir. Nada de <code>delay()</code>, <code>Serial.print()</code> ni <code>malloc()</code>.</li>
+        <li>Variables compartidas declaradas <code>volatile</code> y protegidas con <code>portENTER_CRITICAL_ISR</code>.</li>
+        <li>Delegar el trabajo con <code>xQueueSendFromISR</code> o <code>xTaskNotifyFromISR</code> a una tarea.</li>
+        <li>Filtrar rebotes por tiempo o por hardware (RC + Schmitt trigger).</li>
+        <li>Fuentes en el ESP32: flancos o niveles de GPIO, temporizadores, UART, touch, RTC, watchdog.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Código de referencia</h3>
+      <details class="code" open><summary>Arduino / ESP-IDF</summary><pre class="code"><span class="k">QueueHandle_t</span> q;
+<span class="k">volatile uint32_t</span> ultimo = 0;
+
+<span class="k">void IRAM_ATTR</span> isrBoton() {
+  <span class="k">uint32_t</span> t = millis();
+  <span class="k">if</span> (t - ultimo &lt; 50) <span class="k">return</span>;       <span class="c">// antirrebote</span>
+  ultimo = t;
+  <span class="k">BaseType_t</span> woken = pdFALSE;
+  xQueueSendFromISR(q, &amp;t, &amp;woken);
+  <span class="k">if</span> (woken) portYIELD_FROM_ISR();
+}
+
+<span class="k">void</span> tareaBoton(<span class="k">void</span>*) {
+  <span class="k">uint32_t</span> t;
+  <span class="k">for</span> (;;) <span class="k">if</span> (xQueueReceive(q, &amp;t, portMAX_DELAY))
+    Serial.printf(<span class="s">"Pulsación a %lu ms\n"</span>, t);
+}
+
+<span class="k">void</span> setup() {
+  q = xQueueCreate(10, <span class="k">sizeof</span>(<span class="k">uint32_t</span>));
+  pinMode(0, INPUT_PULLUP);
+  attachInterrupt(0, isrBoton, FALLING);
+  xTaskCreatePinnedToCore(tareaBoton, <span class="s">"btn"</span>, 2048, NULL, 5, NULL, 1);
+}</pre></details>
+      <details class="code"><summary>MicroPython</summary><pre class="code"><span class="k">from</span> machine <span class="k">import</span> Pin, Timer
+<span class="k">import</span> micropython, time
+micropython.alloc_emergency_exception_buf(100)
+ultimo = 0
+
+<span class="k">def</span> procesar(t):            <span class="c"># corre fuera de la ISR</span>
+    print(<span class="s">"Pulsación", t</span>)
+
+<span class="k">def</span> isr(pin):
+    <span class="k">global</span> ultimo
+    t = time.ticks_ms()
+    <span class="k">if</span> time.ticks_diff(t, ultimo) &gt; 50:
+        ultimo = t
+        micropython.schedule(procesar, t)
+
+Pin(0, Pin.IN, Pin.PULL_UP).irq(trigger=Pin.IRQ_FALLING, handler=isr)
+Timer(0).init(period=250, callback=<span class="k">lambda</span> t: <span class="k">None</span>)</pre></details>
+    </div>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th>Concepto</th><th>Quién decide el cambio</th><th>Pila propia</th><th>Paralelismo real</th><th>En el ESP32</th><th>Riesgo típico</th></tr></thead>
+      <tbody>
+        <tr><td><b>Rutina</b> (función)</td><td>El llamador; corre hasta retornar</td><td>No, usa la del llamador</td><td>No</td><td><code>loop()</code>, funciones de C</td><td>Bloquear el bucle principal</td></tr>
+        <tr><td><b>ISR</b></td><td>El hardware, en cualquier instante</td><td>Pila de interrupciones</td><td>Se anida sobre la tarea en curso</td><td><code>attachInterrupt</code>, <code>Pin.irq</code></td><td>Condiciones de carrera, watchdog</td></tr>
+        <tr><td><b>Corrutina</b></td><td>La propia corrutina, en cada <code>await</code></td><td>Marco ligero en el heap</td><td>No: concurrencia cooperativa</td><td><code>asyncio</code> de MicroPython</td><td>Una llamada bloqueante congela todo</td></tr>
+        <tr><td><b>Hilo / tarea</b></td><td>El planificador, por prioridad (expropiativo)</td><td>Sí, configurable</td><td>Sí, uno por núcleo</td><td>Tareas FreeRTOS, <code>_thread</code></td><td>Inversión de prioridad, interbloqueo</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== 05 NÚCLEOS ===================== -->
+<section class="mod" id="nucleos" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 05 · FreeRTOS SMP</span>
+    <h2>Hilos y buen uso del doble núcleo</h2>
+    <p>El ESP32 tiene dos núcleos: PRO_CPU (núcleo 0), donde ESP-IDF ejecuta la pila Wi-Fi/Bluetooth, y APP_CPU (núcleo 1), donde Arduino ejecuta <code>loop()</code>. Cambia la estrategia de asignación y observa la carga y los plazos incumplidos.</p>
+  </div>
+  <div class="card lab">
+    <div class="lab-title"><h3>Planificador FreeRTOS, 1 tick = 1 ms</h3><span class="tag">xTaskCreatePinnedToCore</span></div>
+    <div class="ctrls">
+      <div class="ctl"><label for="rtosMode">Estrategia</label><select id="rtosMode"><option value="uni">Un solo núcleo (CONFIG_FREERTOS_UNICORE)</option><option value="pin" selected>Afinidad: radio en núcleo 0, control en núcleo 1</option><option value="free">Sin afinidad (tskNO_AFFINITY)</option><option value="bad">Mala: todo fijado al núcleo 0 junto al Wi-Fi</option></select></div>
+      <div class="ctl"><label for="rtosMqtt">Duración de la tarea MQTT <output id="rtosMqtto"></output></label><input type="range" id="rtosMqtt" min="10" max="200" value="70"></div>
+      <div class="ctl"><span class="lbl">Sincronización</span><label class="check"><input type="checkbox" id="rtosMutex" checked> Mutex en el bus I²C compartido</label></div>
+      <div class="ctl"><span class="lbl">Control</span><div class="row"><button class="btn ghost" id="rtosReset">Reiniciar estadísticas</button></div></div>
+    </div>
+    <canvas class="cv" id="rtosCv" style="height:300px"></canvas>
+    <div class="grid g2">
+      <div class="tblwrap"><table id="rtosTbl"></table></div>
+      <div class="readout" id="rtosStats"></div>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Buenas prácticas con dos núcleos</h3>
+      <ul class="clean">
+        <li>Deja el núcleo 0 para Wi-Fi, BT y lwIP; fija el control determinista (PID, muestreo) al núcleo 1.</li>
+        <li>Asigna prioridades por urgencia: el lazo de control por encima de la telemetría.</li>
+        <li>Comunica tareas con colas (<code>xQueueSend</code>) en vez de variables globales.</li>
+        <li>Protege recursos compartidos (I²C, SPI, Serial) con mutex; los mutex de FreeRTOS heredan prioridad y evitan la inversión de prioridad.</li>
+        <li>Entre núcleos, una sección crítica necesita <code>portMUX_TYPE</code> con <code>portENTER_CRITICAL</code>; deshabilitar interrupciones en un núcleo no detiene al otro.</li>
+        <li>Nunca uses espera activa: <code>vTaskDelay</code> o <code>vTaskDelayUntil</code> ceden la CPU.</li>
+        <li>Dimensiona la pila y vigila <code>uxTaskGetStackHighWaterMark</code>; deja activo el watchdog de tareas.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Código</h3>
+      <details class="code" open><summary>C++ con FreeRTOS</summary><pre class="code"><span class="k">SemaphoreHandle_t</span> i2cMutex;
+<span class="k">QueueHandle_t</span> qLecturas;
+
+<span class="k">void</span> tareaControl(<span class="k">void</span>*) {            <span class="c">// núcleo 1</span>
+  <span class="k">TickType_t</span> t0 = xTaskGetTickCount();
+  <span class="k">for</span> (;;) {
+    <span class="k">if</span> (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(5))) {
+      <span class="k">float</span> v = leerSensorI2C();
+      xSemaphoreGive(i2cMutex);
+      xQueueSend(qLecturas, &amp;v, 0);
+    }
+    vTaskDelayUntil(&amp;t0, pdMS_TO_TICKS(20));   <span class="c">// 50 Hz exactos</span>
+  }
+}
+
+<span class="k">void</span> tareaMQTT(<span class="k">void</span>*) {               <span class="c">// núcleo 0</span>
+  <span class="k">float</span> v;
+  <span class="k">for</span> (;;) <span class="k">if</span> (xQueueReceive(qLecturas, &amp;v, portMAX_DELAY))
+    mqtt.publish(<span class="s">"planta/temp"</span>, String(v).c_str());
+}
+
+<span class="k">void</span> setup() {
+  i2cMutex  = xSemaphoreCreateMutex();
+  qLecturas = xQueueCreate(32, <span class="k">sizeof</span>(<span class="k">float</span>));
+  xTaskCreatePinnedToCore(tareaControl, <span class="s">"ctrl"</span>, 4096, NULL, 10, NULL, 1);
+  xTaskCreatePinnedToCore(tareaMQTT,   <span class="s">"mqtt"</span>, 6144, NULL,  4, NULL, 0);
+}</pre></details>
+      <details class="code"><summary>MicroPython con _thread</summary><pre class="code"><span class="k">import</span> _thread, time
+lock = _thread.allocate_lock()
+contador = 0
+
+<span class="k">def</span> trabajador(nombre, n):
+    <span class="k">global</span> contador
+    <span class="k">for</span> _ <span class="k">in</span> range(n):
+        <span class="k">with</span> lock:
+            contador += 1
+        time.sleep_ms(10)
+
+_thread.start_new_thread(trabajador, (<span class="s">"A"</span>, 100))
+_thread.start_new_thread(trabajador, (<span class="s">"B"</span>, 100))
+<span class="c"># En MicroPython los hilos son tareas FreeRTOS que comparten un GIL:
+# sirven para concurrencia, no para ejecutar Python en paralelo en ambos núcleos.</span></pre></details>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 06 DOCKER ===================== -->
+<section class="mod" id="docker" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 06 · IIoT</span>
+    <h2>Docker en aplicaciones industriales con ESP32</h2>
+    <p>Docker no corre dentro del ESP32: es un microcontrolador sin MMU ni Linux. Su papel está a ambos lados del firmware: compilar de forma reproducible con la imagen <code>espressif/idf</code>, probar en QEMU, y desplegar en una pasarela de borde el broker, el flujo de datos, la base de series de tiempo y el servidor OTA. Apaga contenedores y mira cómo se degrada la planta.</p>
+  </div>
+  <div class="card lab">
+    <div class="lab-title"><h3>Planta con 4 nodos ESP32 y pasarela de borde</h3><span class="tag">docker compose</span></div>
+    <div class="row" id="dockCtl"></div>
+    <canvas class="cv" id="dockCv" style="height:330px"></canvas>
+    <div class="grid g2">
+      <div class="card flat"><h4>Panel de Grafana (temperatura del horno, °C)</h4><canvas class="cv" id="grafCv" style="height:150px"></canvas></div>
+      <div class="grid" style="grid-template-columns:1fr">
+        <div class="readout" id="dockStats"></div>
+        <div class="row"><button class="btn" id="otaBtn">Compilar en contenedor y desplegar OTA</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="card">
+      <h3>docker-compose.yml de la pasarela</h3>
+      <pre class="code">services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports: ["8883:8883"]          <span class="c"># MQTT sobre TLS</span>
+    volumes: ["./mosquitto:/mosquitto/config"]
+    restart: unless-stopped
+  nodered:
+    image: nodered/node-red:latest
+    depends_on: [mosquitto, influxdb]
+    ports: ["1880:1880"]
+  influxdb:
+    image: influxdb:2.7
+    volumes: ["influx:/var/lib/influxdb2"]
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3000:3000"]
+  ota:
+    image: nginx:alpine           <span class="c"># sirve firmware.bin firmado</span>
+    volumes: ["./firmware:/usr/share/nginx/html:ro"]
+volumes: { influx: {} }</pre>
+    </div>
+    <div class="card">
+      <h3>Compilar y probar el firmware en contenedor</h3>
+      <pre class="code"><span class="c"># Misma versión de toolchain en cada PC y en CI</span>
+docker run --rm -v $PWD:/project -w /project \
+  espressif/idf:v5.3 idf.py set-target esp32 build
+
+<span class="c"># Prueba en emulador QEMU dentro del contenedor</span>
+docker run --rm -v $PWD:/project -w /project \
+  espressif/idf:v5.3 idf.py qemu monitor
+
+<span class="c"># Publicar el binario para OTA</span>
+cp build/planta.bin ./firmware/planta-v1.3.bin</pre>
+      <h4>Casos de uso industriales</h4>
+      <ul class="clean">
+        <li>Monitoreo de vibración y temperatura de motores (mantenimiento predictivo).</li>
+        <li>Pasarela Modbus RTU → MQTT con el ESP32 como conversor RS-485.</li>
+        <li>Actualización OTA escalonada de cientos de nodos desde un contenedor.</li>
+        <li>Reproducibilidad: el mismo contenedor compila hoy y dentro de cinco años.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 07 CRIPTO ===================== -->
+<section class="mod" id="cripto" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 07 · Seguridad</span>
+    <h2>Cifrado y blockchain con el ESP32</h2>
+    <p>El ESP32 incluye aceleradores de hardware para AES, SHA y RSA, un generador de números aleatorios verdadero, cifrado de flash y arranque seguro. Aquí cifras una lectura con AES-GCM, observas el efecto avalancha de SHA-256 y construyes una cadena de bloques con lecturas de tres nodos.</p>
+  </div>
+  <div class="grid g3">
+    <div class="card"><span class="tag">Acelerador</span><h4>AES-128/192/256</h4><p class="note">mbedTLS lo usa automáticamente en TLS y en <code>cryptolib</code>.</p></div>
+    <div class="card"><span class="tag">Acelerador</span><h4>SHA-1/256/384/512 y RSA</h4><p class="note">Hash de bloques, HMAC, firmas y verificación de certificados.</p></div>
+    <div class="card"><span class="tag">eFuse</span><h4>Flash Encryption + Secure Boot</h4><p class="note">La flash se cifra con una clave AES-256 que vive en eFuse; Secure Boot v2 (chips rev. 3) verifica firmas RSA-3072 antes de arrancar.</p></div>
+    <div class="card"><span class="tag">TRNG</span><h4><code>esp_random()</code></h4><p class="note">Entropía del ruido de RF; es verdaderamente aleatorio con Wi-Fi o BT activos.</p></div>
+  </div>
+  <div class="grid g2">
+    <div class="card lab">
+      <div class="lab-title"><h3>AES-256-GCM sobre una lectura</h3><span class="tag">cifrado autenticado</span></div>
+      <div class="ctl"><label for="aesPlain">Mensaje del sensor (JSON)</label><textarea id="aesPlain">{"nodo":"ESP32-A","temp":24.5,"hum":61,"ts":1760864400}</textarea></div>
+      <div class="row"><button class="btn ghost" id="aesKey">Nueva clave</button><button class="btn" id="aesEnc">Cifrar</button><button class="btn warn" id="aesTamper">Alterar 1 byte</button><button class="btn ghost" id="aesDec">Descifrar</button></div>
+      <div class="readout" id="aesOut"></div>
+    </div>
+    <div class="card lab">
+      <div class="lab-title"><h3>SHA-256 y efecto avalancha</h3><span class="tag">hashlib.sha256</span></div>
+      <div class="ctl"><label for="shaIn">Texto de entrada (cambia un solo carácter)</label><input type="text" id="shaIn" value="lote=4471;temp=24.5"></div>
+      <div class="readout" id="shaOut"></div>
+      <canvas class="cv" id="shaCv" style="height:70px"></canvas>
+      <p class="note">Cada celda es un bit del hash; en color, los bits que cambiaron respecto a la entrada anterior. Un buen hash cambia cerca de la mitad (≈128 de 256).</p>
+    </div>
+  </div>
+  <div class="card lab">
+    <div class="lab-title"><h3>Cadena de bloques de lecturas industriales</h3><span class="tag">prueba de trabajo SHA-256</span></div>
+    <div class="ctrls">
+      <div class="ctl"><label for="bcNode">Nodo</label><select id="bcNode"><option>ESP32-A (horno)</option><option>ESP32-B (caldera)</option><option>ESP32-C (bomba)</option></select></div>
+      <div class="ctl"><label for="bcData">Lectura</label><input type="text" id="bcData"></div>
+      <div class="ctl"><label for="bcDiff">Dificultad (ceros hex) <output id="bcDiffo"></output></label><input type="range" id="bcDiff" min="1" max="5" value="3"></div>
+      <div class="ctl"><span class="lbl">Acciones</span><div class="row"><button class="btn ghost" id="bcAdd">Agregar transacción</button><button class="btn" id="bcMine">Minar bloque</button></div></div>
+    </div>
+    <div class="readout" id="bcStatus"></div>
+    <div class="chain" id="bcChain"></div>
+    <p class="note">Edita el texto de cualquier bloque: su hash cambia, deja de cumplir la dificultad y todos los bloques siguientes quedan inválidos porque guardan el hash del anterior. En una arquitectura real, el ESP32 firma cada lectura (ECDSA secp256k1 o Ed25519) y la pasarela ancla el hash del bloque en una red como Hyperledger Fabric o Ethereum; el ESP32 actúa como cliente ligero, no como minero.</p>
+  </div>
+  <div class="grid g2">
+    <details class="code" open><summary>MicroPython: hash, AES y firma de lectura</summary><pre class="code"><span class="k">import</span> hashlib, cryptolib, os, ubinascii, json
+
+clave = os.urandom(32)                     <span class="c"># TRNG del ESP32</span>
+iv = os.urandom(16)
+dato = json.dumps({<span class="s">"temp"</span>: 24.5}).encode()
+dato += b<span class="s">" "</span> * (16 - len(dato) % 16)          <span class="c"># relleno a bloque</span>
+aes = cryptolib.aes(clave, 2, iv)          <span class="c"># 2 = modo CBC</span>
+cifrado = aes.encrypt(dato)
+
+h = hashlib.sha256(cifrado).digest()
+print(ubinascii.hexlify(h))
+
+<span class="c"># Mini prueba de trabajo</span>
+<span class="k">def</span> minar(prev, datos, dif=3):
+    n = 0
+    <span class="k">while True</span>:
+        s = <span class="s">"{}{}{}"</span>.format(prev, datos, n).encode()
+        hx = ubinascii.hexlify(hashlib.sha256(s).digest())
+        <span class="k">if</span> hx[:dif] == b<span class="s">"0"</span> * dif:
+            <span class="k">return</span> n, hx
+        n += 1</pre></details>
+    <details class="code" open><summary>Arduino: AES-GCM con mbedTLS (acelerado)</summary><pre class="code"><span class="k">#include</span> <span class="s">"mbedtls/gcm.h"</span>
+<span class="k">#include</span> <span class="s">"esp_random.h"</span>
+
+<span class="k">uint8_t</span> key[32], iv[12], tag[16], out[64];
+<span class="k">const char</span>* msg = <span class="s">"{\"temp\":24.5}"</span>;
+
+<span class="k">void</span> cifrar() {
+  esp_fill_random(key, 32);
+  esp_fill_random(iv, 12);
+  <span class="k">mbedtls_gcm_context</span> g;
+  mbedtls_gcm_init(&amp;g);
+  mbedtls_gcm_setkey(&amp;g, MBEDTLS_CIPHER_ID_AES, key, 256);
+  mbedtls_gcm_crypt_and_tag(&amp;g, MBEDTLS_GCM_ENCRYPT, strlen(msg),
+      iv, 12, NULL, 0, (<span class="k">const uint8_t</span>*)msg, out, 16, tag);
+  mbedtls_gcm_free(&amp;g);
+  <span class="c">// enviar iv + out + tag por MQTT/ESP-NOW</span>
+}</pre></details>
+  </div>
+</section>
+
+<!-- ===================== 08 ASYNCIO ===================== -->
+<section class="mod" id="asyncio" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 08 · Profundización en tareas</span>
+    <h2>asyncio en MicroPython</h2>
+    <p>Un solo hilo, un ciclo de eventos y varias corrutinas que ceden el control en cada <code>await</code>. Crea tareas, páusalas, reanúdalas o cancélalas; quita el <code>Lock</code> para ver cómo dos tareas mezclan sus mensajes en la UART, e inyecta un <code>time.sleep()</code> para congelar el ciclo completo.</p>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h4>Ciclo de eventos</h4><p class="note">Mantiene una cola de tareas listas y otra de tareas dormidas ordenadas por hora de despertar. Ejecuta una tarea hasta su siguiente <code>await</code> y pasa a la siguiente.</p></div>
+    <div class="card"><h4><code>asyncio.create_task()</code></h4><p class="note">Envuelve una corrutina en una tarea y la agenda de inmediato. Devuelve el objeto <code>Task</code> que luego se puede esperar o cancelar.</p></div>
+    <div class="card"><h4>Pausar, reanudar, cancelar</h4><p class="note">No existe <code>task.pause()</code>: se pausa esperando un <code>asyncio.Event</code>. <code>task.cancel()</code> lanza <code>CancelledError</code> en el siguiente <code>await</code>.</p></div>
+    <div class="card"><h4><code>asyncio.Lock()</code></h4><p class="note">Con <code>async with lock:</code> solo una tarea usa el recurso; las demás esperan sin bloquear el ciclo y el lock se libera aunque la tarea sea cancelada.</p></div>
+    <div class="card"><h4>Multitarea cooperativa</h4><p class="note">Nadie interrumpe a una corrutina: si no llega a un <code>await</code>, ninguna otra tarea avanza. Por eso se usa <code>await asyncio.sleep_ms()</code>, nunca <code>time.sleep()</code>.</p></div>
+  </div>
+  <div class="card lab">
+    <div class="lab-title"><h3>Simulador del ciclo de eventos</h3><span class="tag">uasyncio · un núcleo, un hilo</span></div>
+    <div class="ctrls">
+      <div class="ctl"><label for="aioType">Nueva tarea</label><div class="row" style="flex-wrap:nowrap"><select id="aioType"><option value="sensor">leer_sensor()</option><option value="blink">parpadear_led()</option><option value="uartA">publicar_mqtt() · UART</option><option value="uartB">registrar_log() · UART</option><option value="watch">vigilar_bateria()</option></select><button class="btn" id="aioAdd">create_task</button></div></div>
+      <div class="ctl"><span class="lbl">Recurso compartido</span><label class="check"><input type="checkbox" id="aioLock" checked> Proteger la UART con asyncio.Lock()</label></div>
+      <div class="ctl"><label for="aioSpeed">Velocidad de simulación <output id="aioSpeedo"></output></label><input type="range" id="aioSpeed" min="0.1" max="2" step="0.1" value="0.5"></div>
+      <div class="ctl"><span class="lbl">Romper la cooperación</span><button class="btn warn" id="aioBlock">Inyectar time.sleep(1)</button></div>
+    </div>
+    <canvas class="cv" id="aioCv" style="height:240px"></canvas>
+    <div class="grid g2">
+      <div class="grid" style="grid-template-columns:1fr">
+        <h4>Tareas</h4>
+        <div class="tasklist" id="aioTasks"></div>
+        <div class="readout" id="aioQueues"></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr">
+        <h4>Monitor serie (UART0)</h4>
+        <div class="serial" id="aioSerial" aria-live="off"></div>
+      </div>
+    </div>
+  </div>
+  <details class="code" open><summary>Programa completo en MicroPython que reproduce el simulador</summary><pre class="code"><span class="k">import</span> asyncio
+<span class="k">from</span> machine <span class="k">import</span> Pin, ADC
+
+uart_lock = asyncio.Lock()
+continuar = {}                               <span class="c"># un Event por tarea pausable</span>
+
+<span class="k">async def</span> punto_de_pausa(nombre):
+    <span class="k">await</span> continuar[nombre].wait()          <span class="c"># bloquea solo esta tarea</span>
+
+<span class="k">async def</span> leer_sensor():
+    adc = ADC(Pin(34))
+    <span class="k">while True</span>:
+        <span class="k">await</span> punto_de_pausa(<span class="s">"sensor"</span>)
+        print(<span class="s">"[sensor]"</span>, adc.read_uv() // 1000, <span class="s">"mV"</span>)
+        <span class="k">await</span> asyncio.sleep_ms(700)
+
+<span class="k">async def</span> escribir_uart(nombre, texto):
+    <span class="k">try</span>:
+        <span class="k">while True</span>:
+            <span class="k">await</span> punto_de_pausa(nombre)
+            <span class="k">async with</span> uart_lock:              <span class="c"># sección crítica cooperativa</span>
+                <span class="k">for</span> i <span class="k">in</span> range(0, len(texto), 4):
+                    uart.write(texto[i:i+4])
+                    <span class="k">await</span> asyncio.sleep_ms(15)    <span class="c"># cede: aquí otra tarea podría colarse</span>
+                uart.write(<span class="s">"\n"</span>)
+            <span class="k">await</span> asyncio.sleep_ms(400)
+    <span class="k">except</span> asyncio.CancelledError:
+        print(<span class="s">"limpieza de"</span>, nombre)           <span class="c"># el lock ya se liberó</span>
+        <span class="k">raise</span>
+
+<span class="k">async def</span> main():
+    <span class="k">for</span> n <span class="k">in</span> (<span class="s">"sensor"</span>, <span class="s">"mqtt"</span>, <span class="s">"log"</span>):
+        continuar[n] = asyncio.Event(); continuar[n].set()
+    t1 = asyncio.create_task(leer_sensor())
+    t2 = asyncio.create_task(escribir_uart(<span class="s">"mqtt"</span>, <span class="s">"MQTT planta/temp=24.5"</span>))
+    t3 = asyncio.create_task(escribir_uart(<span class="s">"log"</span>, <span class="s">"LOG nivel=INFO ok"</span>))
+    <span class="k">await</span> asyncio.sleep(5)
+    continuar[<span class="s">"sensor"</span>].clear()               <span class="c"># pausar</span>
+    <span class="k">await</span> asyncio.sleep(3)
+    continuar[<span class="s">"sensor"</span>].set()                 <span class="c"># reanudar</span>
+    t3.cancel()                                 <span class="c"># cancelar</span>
+    <span class="k">await</span> asyncio.gather(t1, t2)
+
+asyncio.run(main())</pre></details>
+</section>
+
+<!-- ===================== 09 VISIÓN ===================== -->
+<section class="mod" id="vision" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 09 · Visión artificial + actuación embebida</span>
+    <h2>OpenCV, MediaPipe y YOLO controlando el ESP32</h2>
+    <p>El ESP32-WROOM-32 no tiene capacidad para ejecutar estos modelos: la inferencia ocurre en un PC, una Jetson o una Raspberry Pi, y el ESP32 recibe órdenes compactas por serie, UDP, MQTT o ESP-NOW para mover actuadores. Las escenas siguientes son sintéticas; reproducen la salida que entregan las librerías reales.</p>
+  </div>
+  <div class="flow" aria-label="Flujo de datos">
+    <span class="st">cv2.VideoCapture(0)</span><span class="ar">→</span><span class="st">cv2.cvtColor BGR→RGB</span><span class="ar">→</span><span class="st">MediaPipe Hands / YOLOv8-seg</span><span class="ar">→</span><span class="st">reglas o lógica de zona</span><span class="ar">→</span><span class="st">JSON por UDP/MQTT/Serial</span><span class="ar">→</span><span class="st">ESP32: PWM, relé, servo</span>
+  </div>
+  <div class="grid g2">
+    <div class="card lab">
+      <div class="lab-title"><h3>Gestos con MediaPipe Hands</h3><span class="tag">21 landmarks</span></div>
+      <div class="row" id="handGest"></div>
+      <canvas class="cv" id="handCv" style="height:300px"></canvas>
+      <div class="readout" id="handOut"></div>
+      <div class="espmock">
+        <div><div class="led" id="hLed"></div>LED GPIO2</div>
+        <div><svg width="70" height="44" viewBox="0 0 70 44" aria-hidden="true"><path d="M5 40 A30 30 0 0 1 65 40" fill="none" stroke="var(--line)" stroke-width="4"/><line id="hNeedle" x1="35" y1="40" x2="35" y2="12" stroke="var(--copper)" stroke-width="3" stroke-linecap="round"/><circle cx="35" cy="40" r="4" fill="var(--ink)"/></svg><span id="hServo">servo 90°</span></div>
+        <div><div class="led" id="hRgb"></div>LED RGB</div>
+        <div><span class="mono" id="hPwm" style="font-size:1.05rem">0 %</span>PWM motor</div>
+      </div>
+    </div>
+    <div class="card lab">
+      <div class="lab-title"><h3>Segmentación con YOLOv8-seg</h3><span class="tag">entorno industrial</span></div>
+      <div class="ctrls">
+        <div class="ctl"><label for="yoloConf">Umbral de confianza <output id="yoloConfo"></output></label><input type="range" id="yoloConf" min="0.1" max="0.95" step="0.01" value="0.5"></div>
+        <div class="ctl"><span class="lbl">Capas</span><label class="check"><input type="checkbox" id="yoloMask" checked> Máscaras</label><label class="check"><input type="checkbox" id="yoloBox" checked> Cajas y etiquetas</label></div>
+      </div>
+      <canvas class="cv" id="yoloCv" style="height:300px"></canvas>
+      <div class="readout" id="yoloOut"></div>
+      <div class="espmock">
+        <div><div class="led" id="yAlarm"></div>Sirena (relé GPIO26)</div>
+        <div><svg width="70" height="44" viewBox="0 0 70 44" aria-hidden="true"><path d="M5 40 A30 30 0 0 1 65 40" fill="none" stroke="var(--line)" stroke-width="4"/><line id="yNeedle" x1="35" y1="40" x2="35" y2="12" stroke="var(--copper)" stroke-width="3" stroke-linecap="round"/><circle cx="35" cy="40" r="4" fill="var(--ink)"/></svg><span id="yPan">pan 90°</span></div>
+        <div><span class="mono" id="yBelt" style="font-size:1.05rem">ON</span>Banda transportadora</div>
+      </div>
+    </div>
+  </div>
+  <div class="grid g2">
+    <details class="code" open><summary>Python (PC): MediaPipe → ESP32 por UDP</summary><pre class="code"><span class="k">import</span> cv2, mediapipe <span class="k">as</span> mp, socket, json, math
+
+ESP = (<span class="s">"192.168.1.50"</span>, 4210)
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
+PUNTAS, PIP = [8, 12, 16, 20], [6, 10, 14, 18]
+
+cap = cv2.VideoCapture(0)
+<span class="k">while</span> cap.isOpened():
+    ok, frame = cap.read()
+    res = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    <span class="k">if</span> res.multi_hand_landmarks:
+        lm = res.multi_hand_landmarks[0].landmark
+        dedos = [lm[t].y &lt; lm[p].y <span class="k">for</span> t, p <span class="k">in</span> zip(PUNTAS, PIP)]
+        pulgar = abs(lm[4].x - lm[9].x) &gt; abs(lm[3].x - lm[9].x)
+        pinza = math.dist((lm[4].x, lm[4].y), (lm[8].x, lm[8].y))
+        cmd = {<span class="s">"dedos"</span>: sum(dedos) + pulgar, <span class="s">"pwm"</span>: min(1, pinza / 0.25)}
+        sock.sendto(json.dumps(cmd).encode(), ESP)
+    cv2.imshow(<span class="s">"gestos"</span>, frame)
+    <span class="k">if</span> cv2.waitKey(1) == 27: <span class="k">break</span></pre></details>
+    <details class="code" open><summary>Python (PC): YOLO + zona → MQTT, y receptor en el ESP32</summary><pre class="code"><span class="k">from</span> ultralytics <span class="k">import</span> YOLO
+<span class="k">import</span> cv2, numpy <span class="k">as</span> np, paho.mqtt.client <span class="k">as</span> mqtt
+
+modelo = YOLO(<span class="s">"yolov8n-seg.pt"</span>)
+zona = np.array([[220,120],[420,120],[420,300],[220,300]])
+cli = mqtt.Client(); cli.connect(<span class="s">"gateway.local"</span>, 1883)
+
+<span class="k">for</span> r <span class="k">in</span> modelo(<span class="s">0</span>, stream=True, conf=0.5):
+    alarma = False
+    <span class="k">for</span> caja, cls <span class="k">in</span> zip(r.boxes.xyxy, r.boxes.cls):
+        <span class="k">if</span> modelo.names[int(cls)] == <span class="s">"person"</span>:
+            cx, cy = float((caja[0]+caja[2])/2), float(caja[3])
+            alarma |= cv2.pointPolygonTest(zona, (cx, cy), False) &gt;= 0
+    cli.publish(<span class="s">"planta/zona1/alarma"</span>, int(alarma))
+
+<span class="c"># --- ESP32 (MicroPython) ---</span>
+<span class="k">from</span> umqtt.simple <span class="k">import</span> MQTTClient
+<span class="k">from</span> machine <span class="k">import</span> Pin
+rele = Pin(26, Pin.OUT)
+<span class="k">def</span> cb(topic, msg): rele.value(int(msg))
+c = MQTTClient(<span class="s">"esp-zona1"</span>, <span class="s">"gateway.local"</span>); c.set_callback(cb)
+c.connect(); c.subscribe(<span class="s">b"planta/zona1/alarma"</span>)
+<span class="k">while True</span>: c.wait_msg()</pre></details>
+  </div>
+</section>
+
+<!-- ===================== 10 ENJAMBRE ===================== -->
+<section class="mod" id="enjambre" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 10 · Inteligencia de enjambre</span>
+    <h2>Drones ESP32 maestro-esclavo en búsqueda y rescate</h2>
+    <p>Cada dron esclavo lleva un ESP32 que mide una señal de las personas atrapadas (calor corporal, CO₂ o el RSSI de su teléfono) y la reporta por ESP-NOW al maestro en la base. El maestro mantiene la mejor posición global y la difunde. Cambia de algoritmo y compara cómo exploran.</p>
+  </div>
+  <div class="card lab">
+    <div class="ctrls">
+      <div class="ctl"><label for="swAlg">Algoritmo</label><select id="swAlg">
+        <option value="pso">Enjambre de partículas (PSO)</option>
+        <option value="abc">Colonia de abejas artificiales (ABC)</option>
+        <option value="aco">Colonia de hormigas (ACO)</option>
+        <option value="ffa">Luciérnagas (Firefly)</option>
+        <option value="cs">Búsqueda del cuco (Cuckoo Search)</option>
+        <option value="ba">Murciélagos (Bat Algorithm)</option>
+        <option value="mos">Zancudos: búsqueda de huésped (MHSA)</option>
+      </select></div>
+      <div class="ctl"><label for="swN">Drones esclavos <output id="swNo"></output></label><input type="range" id="swN" min="4" max="30" value="14"></div>
+      <div class="ctl"><label for="swSpeed">Velocidad <output id="swSpeedo"></output></label><input type="range" id="swSpeed" min="0.25" max="3" step="0.25" value="1"></div>
+      <div class="ctl"><span class="lbl">Vista</span><label class="check"><input type="checkbox" id="swHeat" checked> Mapa de señal</label><label class="check"><input type="checkbox" id="swLinks" checked> Enlaces ESP-NOW</label></div>
+      <div class="ctl"><span class="lbl">Escenario</span><div class="row"><button class="btn" id="swReset">Nuevo escenario</button><button class="btn ghost" id="swPause">Pausar</button></div></div>
+    </div>
+    <canvas class="cv" id="swCv" style="height:480px"></canvas>
+    <div class="grid g2">
+      <div class="readout" id="swStats"></div>
+      <div class="serial" id="swLog" style="height:150px"></div>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="card" id="swDesc"></div>
+    <div class="card">
+      <h3>Comparación rápida</h3>
+      <div class="tblwrap"><table>
+        <thead><tr><th>Algoritmo</th><th>Inspiración</th><th>Memoria compartida</th><th>Fuerte en</th></tr></thead>
+        <tbody>
+          <tr><td>PSO</td><td>Bandadas de aves</td><td>Mejor global en el maestro</td><td>Convergencia rápida</td></tr>
+          <tr><td>ABC</td><td>Abejas obreras, observadoras y exploradoras</td><td>Fuentes de alimento</td><td>Equilibrio exploración/explotación</td></tr>
+          <tr><td>ACO</td><td>Rastros de feromona</td><td>Mapa de feromonas en el maestro</td><td>Cubrir rutas y retornar</td></tr>
+          <tr><td>Firefly</td><td>Atracción por brillo</td><td>Brillo de vecinos</td><td>Varias víctimas a la vez</td></tr>
+          <tr><td>Cuckoo</td><td>Parasitismo de nidos + vuelos de Lévy</td><td>Mejor nido</td><td>Saltos largos, escapar de óptimos locales</td></tr>
+          <tr><td>Bat</td><td>Ecolocalización</td><td>Mejor global, volumen y tasa de pulso</td><td>Refinamiento local adaptativo</td></tr>
+          <tr><td>MHSA</td><td>Zancudos que siguen la pluma de CO₂</td><td>Ninguna: cada uno sigue el gradiente</td><td>Descentralizado, tolera pérdida del maestro</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+  <details class="code"><summary>MicroPython: maestro y esclavo con ESP-NOW</summary><pre class="code"><span class="c"># ---- ESCLAVO (dron) ----</span>
+<span class="k">import</span> network, espnow, struct, asyncio
+sta = network.WLAN(network.STA_IF); sta.active(True)
+en = espnow.ESPNow(); en.active(True)
+MAESTRO = b<span class="s">'\x24\x0a\xc4\x11\x22\x33'</span>
+en.add_peer(MAESTRO)
+
+<span class="k">async def</span> reportar(dron):
+    <span class="k">while True</span>:
+        x, y = dron.posicion()
+        f = dron.leer_sensor()                       <span class="c"># calor / CO2 / RSSI</span>
+        en.send(MAESTRO, struct.pack(<span class="s">"&lt;Bfff"</span>, dron.id, x, y, f))
+        <span class="k">await</span> asyncio.sleep_ms(100)
+
+<span class="k">async def</span> escuchar(dron):
+    <span class="k">while True</span>:
+        mac, msg = en.recv(0)
+        <span class="k">if</span> msg:
+            gx, gy, gf = struct.unpack(<span class="s">"&lt;fff"</span>, msg)
+            dron.actualizar_mejor_global(gx, gy, gf)    <span class="c"># PSO, Bat, Cuckoo…</span>
+        <span class="k">await</span> asyncio.sleep_ms(20)
+
+<span class="c"># ---- MAESTRO (base) ----</span>
+mejor = (0, 0, -1)
+<span class="k">while True</span>:
+    mac, msg = en.recv()
+    i, x, y, f = struct.unpack(<span class="s">"&lt;Bfff"</span>, msg)
+    <span class="k">if</span> f &gt; mejor[2]:
+        mejor = (x, y, f)
+        en.send(b<span class="s">'\xff'</span>*6, struct.pack(<span class="s">"&lt;fff"</span>, *mejor))   <span class="c"># broadcast</span>
+    <span class="k">if</span> f &gt; 0.9: print(<span class="s">"PERSONA en"</span>, x, y)</pre></details>
+</section>
+
+<!-- ===================== 11 PREGUNTAS ===================== -->
+<section class="mod" id="preguntas" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 11 · Evaluación</span>
+    <h2>Preguntas para argumentar</h2>
+    <p>Cada pregunta pide una respuesta razonada, no un dato memorizado. Escribe tu respuesta; se guarda en este navegador. Abre los criterios solo después de responder: indican qué debe contener una respuesta coherente.</p>
+  </div>
+  <div class="row"><button class="btn" id="qCopy">Copiar todas mis respuestas</button><span class="note" id="qMsg"></span></div>
+  <div id="qList" class="grid" style="grid-template-columns:1fr"></div>
+</section>
+
+</main>
+<footer><div class="wrap">Laboratorio ESP32-WROOM-32 · Simulaciones didácticas: los valores son representativos de la hoja de datos de Espressif y de ESP-IDF, no mediciones de un chip concreto.</div></footer>
+<script>
+/* ============ utilidades comunes ============ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const C = {};
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  ['bg','panel','ink','muted','line','soft','pcb','copper','gold','ok','warn','bad','info','vio','hdr-ink'].forEach(k => C[k] = cs.getPropertyValue('--' + k).trim());
+}
+readColors();
+function rgba(hex, a) {
+  if (!hex || hex[0] !== '#') return hex;
+  let h = hex.slice(1); if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+}
+function fit(cv) {
+  const r = cv.getBoundingClientRect(); const d = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(10, Math.round(r.width)), h = Math.max(10, Math.round(r.height));
+  if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); }
+  const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return { x, w, h };
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = (a, b) => a + Math.random() * (b - a);
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const fmtHz = f => f >= 1e6 ? (f / 1e6).toFixed(f >= 1e7 ? 1 : 2) + ' MHz' : f >= 1e3 ? (f / 1e3).toFixed(f >= 1e4 ? 1 : 2) + ' kHz' : f.toFixed(f < 10 ? 2 : 0) + ' Hz';
+const fmtT = s => s >= 1 ? s.toFixed(2) + ' s' : s >= 1e-3 ? (s * 1e3).toFixed(3) + ' ms' : s >= 1e-6 ? (s * 1e6).toFixed(3) + ' µs' : (s * 1e9).toFixed(1) + ' ns';
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+function axisText(x, t, px, py, align = 'left', col = C.muted, size = 10) { x.fillStyle = col; x.font = `${size}px "JetBrains Mono", monospace`; x.textAlign = align; x.fillText(t, px, py); }
+
+/* ============ pestañas y bucle ============ */
+const onShow = {}, anim = {};
+let ACTIVE = 'pines';
+function show(id) {
+  if (!document.getElementById(id) || !document.getElementById(id).hasAttribute('data-panel')) id = 'pines';
+  ACTIVE = id;
+  $$('[data-panel]').forEach(p => p.hidden = p.id !== id);
+  $$('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === id ? 'true' : 'false'));
+  try { history.replaceState(null, '', '#' + id); } catch (e) {}
+  const t = $(`.tab[data-tab="${id}"]`); if (t) t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  requestAnimationFrame(() => onShow[id] && onShow[id]());
+}
+$$('.tab').forEach(t => t.addEventListener('click', () => { show(t.dataset.tab); const nav = $('.tabs'); window.scrollTo({ top: Math.max(0, $('main').offsetTop - nav.offsetHeight - 4), behavior: 'smooth' }); }));
+let lastT = performance.now();
+function frame(t) {
+  const dt = Math.min(60, t - lastT); lastT = t;
+  try { if (anim[ACTIVE]) anim[ACTIVE](dt, t); } catch (e) { console.error(e); }
+  requestAnimationFrame(frame);
+}
+function themeChanged() { readColors(); drawHeader(); onShow[ACTIVE] && onShow[ACTIVE](); }
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeChanged); } catch (e) {}
+new MutationObserver(themeChanged).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+window.addEventListener('resize', () => { drawHeader(); onShow[ACTIVE] && onShow[ACTIVE](); });
+
+/* ============ cabecera: pistas de PCB ============ */
+function drawHeader() {
+  const cv = $('#hdrCv'); const { x, w, h } = fit(cv);
+  x.clearRect(0, 0, w, h);
+  let seed = 7; const r = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  x.strokeStyle = rgba(C['hdr-ink'], 0.28); x.lineWidth = 1.4; x.fillStyle = rgba(C['hdr-ink'], 0.32);
+  for (let i = 0; i < 26; i++) {
+    let px = w * 0.45 + r() * w * 0.6, py = r() * h;
+    x.beginPath(); x.moveTo(px, py);
+    for (let k = 0; k < 4; k++) {
+      const dir = Math.floor(r() * 4), L = 20 + r() * 70;
+      if (dir === 0) px += L; else if (dir === 1) py += L * 0.6; else if (dir === 2) { px += L * 0.7; py -= L * 0.7; } else { px += L * 0.7; py += L * 0.7; }
+      x.lineTo(px, py);
+    }
+    x.stroke(); x.beginPath(); x.arc(px, py, 3, 0, 7); x.fill();
+  }
+}
+
+/* ============ 01 PINES ============ */
+const PINS = [
+  { n: 1, nm: 'GND', t: ['pwr'], h: 'tierra', fn: ['Tierra común'], note: 'Conecta todos los GND (1, 15, 38 y el pad 39) al plano de tierra.' },
+  { n: 2, nm: '3V3', t: ['pwr'], h: 'alimentación', fn: ['Alimentación 3.0–3.6 V'], note: 'Desacopla con 10 µF + 100 nF junto al pin. Los picos de transmisión Wi-Fi rondan 500 mA.' },
+  { n: 3, nm: 'EN', t: ['pwr'], h: 'reset', fn: ['Chip enable, activo en alto', 'Llevarlo a GND reinicia el chip'], note: 'Usa una red RC (10 kΩ + 1 µF) para un arranque limpio. Es el botón EN/RST de las placas DevKit.' },
+  { n: 4, nm: 'SENSOR_VP', g: 36, t: ['adc1', 'in', 'rtc'], h: 'ADC1_0', fn: ['ADC1_CH0', 'RTC_GPIO0', 'Entrada del sensor Hall (VP)'], note: 'Solo entrada, sin resistencias internas de pull.' },
+  { n: 5, nm: 'SENSOR_VN', g: 39, t: ['adc1', 'in', 'rtc'], h: 'ADC1_3', fn: ['ADC1_CH3', 'RTC_GPIO3'], note: 'Solo entrada, sin resistencias internas de pull.' },
+  { n: 6, nm: 'IO34', g: 34, t: ['adc1', 'in', 'rtc'], h: 'ADC1_6', fn: ['ADC1_CH6', 'RTC_GPIO4'], note: 'Buena opción para sensores analógicos con Wi-Fi activo.' },
+  { n: 7, nm: 'IO35', g: 35, t: ['adc1', 'in', 'rtc'], h: 'ADC1_7', fn: ['ADC1_CH7', 'RTC_GPIO5'], note: 'Muchas placas miden aquí la batería con un divisor resistivo.' },
+  { n: 8, nm: 'IO32', g: 32, t: ['adc1', 'touch', 'rtc', 'pwm'], h: 'ADC1_4 · T9', fn: ['ADC1_CH4', 'TOUCH9', 'RTC_GPIO9', 'XTAL_32K_P (cristal de 32 kHz)'], note: 'Entrada/salida completa; puede despertar al chip del deep sleep.' },
+  { n: 9, nm: 'IO33', g: 33, t: ['adc1', 'touch', 'rtc', 'pwm'], h: 'ADC1_5 · T8', fn: ['ADC1_CH5', 'TOUCH8', 'RTC_GPIO8', 'XTAL_32K_N'], note: 'Entrada/salida completa con ADC1: compatible con Wi-Fi.' },
+  { n: 10, nm: 'IO25', g: 25, t: ['adc2', 'dac', 'rtc', 'pwm'], h: 'DAC1 · ADC2_8', fn: ['DAC_1 (8 bits)', 'ADC2_CH8', 'RTC_GPIO6', 'EMAC_RXD0'], note: 'Salida analógica real de 0 a 3.3 V: audio sencillo o tensiones de referencia.' },
+  { n: 11, nm: 'IO26', g: 26, t: ['adc2', 'dac', 'rtc', 'pwm'], h: 'DAC2 · ADC2_9', fn: ['DAC_2 (8 bits)', 'ADC2_CH9', 'RTC_GPIO7', 'EMAC_RXD1'], note: 'Segundo canal DAC.' },
+  { n: 12, nm: 'IO27', g: 27, t: ['adc2', 'touch', 'rtc', 'pwm'], h: 'ADC2_7 · T7', fn: ['ADC2_CH7', 'TOUCH7', 'RTC_GPIO17', 'EMAC_RX_DV'], note: '' },
+  { n: 13, nm: 'IO14', g: 14, t: ['adc2', 'touch', 'rtc', 'pwm', 'com'], h: 'HSPI_CLK · T6', fn: ['ADC2_CH6', 'TOUCH6', 'RTC_GPIO16', 'HSPI_CLK', 'JTAG MTMS', 'HS2_CLK (SD)'], note: 'Emite pulsos PWM breves durante el arranque.' },
+  { n: 14, nm: 'IO12', g: 12, t: ['adc2', 'touch', 'rtc', 'pwm', 'com', 'strap'], h: 'MTDI ⚠', fn: ['ADC2_CH5', 'TOUCH5', 'RTC_GPIO15', 'HSPI_MISO', 'JTAG MTDI'], note: 'Strapping: selecciona la tensión de la flash (VDD_SDIO). Debe estar en BAJO al reset en el WROOM-32 (flash de 3.3 V); en alto el módulo no arranca.' },
+  { n: 15, nm: 'GND', t: ['pwr'], h: 'tierra', fn: ['Tierra'], note: '' },
+  { n: 16, nm: 'IO13', g: 13, t: ['adc2', 'touch', 'rtc', 'pwm', 'com'], h: 'HSPI_MOSI · T4', fn: ['ADC2_CH4', 'TOUCH4', 'RTC_GPIO14', 'HSPI_MOSI', 'JTAG MTCK'], note: '' },
+  { n: 17, nm: 'SD2', g: 9, t: ['flash'], h: 'GPIO9', fn: ['SPI flash D2 (SHD)'], note: 'Reservado para la flash interna. No conectar.' },
+  { n: 18, nm: 'SD3', g: 10, t: ['flash'], h: 'GPIO10', fn: ['SPI flash D3 (SWP)'], note: 'Reservado para la flash interna. No conectar.' },
+  { n: 19, nm: 'CMD', g: 11, t: ['flash'], h: 'GPIO11', fn: ['SPI flash CS'], note: 'Reservado para la flash interna. No conectar.' },
+  { n: 20, nm: 'CLK', g: 6, t: ['flash'], h: 'GPIO6', fn: ['SPI flash CLK'], note: 'Reservado para la flash interna. No conectar.' },
+  { n: 21, nm: 'SD0', g: 7, t: ['flash'], h: 'GPIO7', fn: ['SPI flash D0'], note: 'Reservado para la flash interna. No conectar.' },
+  { n: 22, nm: 'SD1', g: 8, t: ['flash'], h: 'GPIO8', fn: ['SPI flash D1'], note: 'Reservado para la flash interna. No conectar.' },
+  { n: 23, nm: 'IO15', g: 15, t: ['adc2', 'touch', 'rtc', 'pwm', 'com', 'strap'], h: 'MTDO ⚠', fn: ['ADC2_CH3', 'TOUCH3', 'RTC_GPIO13', 'HSPI_CS0', 'JTAG MTDO'], note: 'Strapping: en BAJO al reset silencia el log de arranque por UART0. Tiene pull-up interno.' },
+  { n: 24, nm: 'IO2', g: 2, t: ['adc2', 'touch', 'rtc', 'pwm', 'strap'], h: 'LED ⚠', fn: ['ADC2_CH2', 'TOUCH2', 'RTC_GPIO12', 'HSPI_WP', 'HS2_DATA0'], note: 'Strapping: debe quedar en BAJO o flotante para entrar al modo de descarga. Es el LED azul de las DevKit.' },
+  { n: 25, nm: 'IO0', g: 0, t: ['adc2', 'touch', 'rtc', 'pwm', 'strap'], h: 'BOOT ⚠', fn: ['ADC2_CH1', 'TOUCH1', 'RTC_GPIO11', 'CLK_OUT1', 'EMAC_TX_CLK'], note: 'Strapping principal: en BAJO al reset entra al bootloader (botón BOOT). Después del arranque sirve como botón de usuario.' },
+  { n: 26, nm: 'IO4', g: 4, t: ['adc2', 'touch', 'rtc', 'pwm'], h: 'ADC2_0 · T0', fn: ['ADC2_CH0', 'TOUCH0', 'RTC_GPIO10', 'HSPI_HD'], note: '' },
+  { n: 27, nm: 'IO16', g: 16, t: ['pwm', 'com'], h: 'U2RXD', fn: ['UART2 RX', 'HS1_DATA4'], note: 'Libre en el WROOM-32; en el WROVER lo ocupa la PSRAM.' },
+  { n: 28, nm: 'IO17', g: 17, t: ['pwm', 'com'], h: 'U2TXD', fn: ['UART2 TX', 'HS1_DATA5'], note: 'Libre en el WROOM-32; en el WROVER lo ocupa la PSRAM.' },
+  { n: 29, nm: 'IO5', g: 5, t: ['pwm', 'com', 'strap'], h: 'VSPI_CS ⚠', fn: ['VSPI_CS0', 'HS1_DATA6'], note: 'Strapping: temporización del esclavo SDIO. Tiene pull-up y emite PWM al arrancar.' },
+  { n: 30, nm: 'IO18', g: 18, t: ['pwm', 'com'], h: 'VSPI_CLK', fn: ['VSPI_CLK', 'HS1_DATA7'], note: '' },
+  { n: 31, nm: 'IO19', g: 19, t: ['pwm', 'com'], h: 'VSPI_MISO', fn: ['VSPI_MISO', 'U0CTS', 'EMAC_TXD0'], note: '' },
+  { n: 32, nm: 'NC', t: [], h: 'sin conexión', fn: ['No conectado'], note: '' },
+  { n: 33, nm: 'IO21', g: 21, t: ['pwm', 'com'], h: 'I²C SDA', fn: ['SDA por defecto (Wire)', 'VSPI_HD', 'EMAC_TX_EN'], note: 'Agrega pull-up de 4.7 kΩ a 3.3 V en el bus I²C.' },
+  { n: 34, nm: 'RXD0', g: 3, t: ['com', 'pwm'], h: 'U0RXD', fn: ['UART0 RX (programación y monitor)', 'CLK_OUT2'], note: 'En alto durante el arranque. Evítalo si usas el monitor serie.' },
+  { n: 35, nm: 'TXD0', g: 1, t: ['com', 'pwm'], h: 'U0TXD', fn: ['UART0 TX (programación y monitor)', 'CLK_OUT3', 'EMAC_RXD2'], note: 'Emite el log de arranque.' },
+  { n: 36, nm: 'IO22', g: 22, t: ['pwm', 'com'], h: 'I²C SCL', fn: ['SCL por defecto (Wire)', 'VSPI_WP', 'U0RTS'], note: '' },
+  { n: 37, nm: 'IO23', g: 23, t: ['pwm', 'com'], h: 'VSPI_MOSI', fn: ['VSPI_MOSI', 'HS1_STROBE'], note: '' },
+  { n: 38, nm: 'GND', t: ['pwr'], h: 'tierra', fn: ['Tierra'], note: '' },
+  { n: 39, nm: 'GND', t: ['pwr'], h: 'pad térmico', fn: ['Pad central de tierra y disipación'], note: 'Suéldalo al plano de GND con vías térmicas.' }
+];
+const PF = [
+  ['adc1', 'ADC1', 'info'], ['adc2', 'ADC2', 'vio'], ['dac', 'DAC', 'copper'], ['touch', 'Touch', 'gold'], ['pwm', 'PWM', 'pcb'],
+  ['in', 'Solo entrada', 'info'], ['strap', 'Strapping', 'warn'], ['flash', 'Flash (no usar)', 'bad'], ['com', 'UART · SPI · I²C', 'ok'], ['rtc', 'RTC / despertar', 'muted'], ['pwr', 'Alimentación', 'copper']
+];
+let pinSel = 25, pinFilter = null;
+function padColor(p) {
+  if (p.t.includes('flash')) return C.bad;
+  if (p.t.includes('pwr')) return p.nm === 'GND' ? C.muted : C.copper;
+  if (p.t.includes('strap')) return C.warn;
+  if (p.t.includes('in')) return C.info;
+  if (p.t.includes('dac')) return C.copper;
+  if (!p.t.length) return C.line;
+  return C.pcb;
+}
+function pinGeom(n) {
+  if (n <= 14) return { x: 126, y: 172 + (n - 1) * 30, w: 28, h: 16, side: 'L' };
+  if (n <= 24) return { x: 170 + (n - 15) * 24.5, y: 616, w: 16, h: 28, side: 'B' };
+  if (n <= 38) return { x: 406, y: 172 + (38 - n) * 30, w: 28, h: 16, side: 'R' };
+  return { x: 225, y: 470, w: 110, h: 90, side: 'C' };
+}
+function buildPinSvg() {
+  let s = `<svg viewBox="0 0 560 708" role="img" aria-label="Distribución de pines del ESP32-WROOM-32">`;
+  s += `<rect x="140" y="24" width="280" height="606" rx="6" fill="${C.pcb}" opacity=".9"/>`;
+  s += `<rect x="150" y="34" width="260" height="110" rx="3" fill="none" stroke="${C.gold}" stroke-width="1" opacity=".5"/>`;
+  let m = 'M170 120 V60 H200 V110 H230 V60 H260 V110 H290 V60 H320 V110 H350 V60 H380 V120';
+  s += `<path d="${m}" fill="none" stroke="${C.gold}" stroke-width="5" stroke-linejoin="round"/>`;
+  s += `<text x="280" y="138" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="${C.gold}">ANTENA PCB · mantener libre de cobre</text>`;
+  s += `<rect x="160" y="158" width="240" height="440" rx="4" fill="${C.soft}" stroke="${C.line}"/>`;
+  s += `<text x="280" y="250" text-anchor="middle" font-family="Saira Semi Condensed" font-weight="700" font-size="22" fill="${C.ink}">ESP32-WROOM-32</text>`;
+  s += `<text x="280" y="272" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="${C.muted}">Xtensa LX6 ×2 · 240 MHz · 4 MB</text>`;
+  s += `<text x="280" y="290" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="${C.muted}">blindaje metálico (shield)</text>`;
+  PINS.forEach(p => {
+    const g = pinGeom(p.n), col = padColor(p);
+    const cls = 'pad' + (p.n === pinSel ? ' sel' : '') + (pinFilter && !p.t.includes(pinFilter) ? ' dim' : '');
+    s += `<g class="${cls}" data-pin="${p.n}" tabindex="0" role="button" aria-label="Pin ${p.n} ${p.nm}">`;
+    if (g.side === 'C') {
+      s += `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="3" fill="${rgba(C.muted, .25)}" stroke="${C.muted}" stroke-dasharray="4 3"/>`;
+      s += `<text x="${g.x + g.w / 2}" y="${g.y + 42}" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="${C.ink}">39 · GND</text><text x="${g.x + g.w / 2}" y="${g.y + 56}" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="${C.muted}">pad térmico</text>`;
+    } else {
+      s += `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="2" fill="${col}" stroke="${C.line}"/>`;
+      const fs = 11;
+      if (g.side === 'L') {
+        s += `<text x="${g.x + g.w / 2}" y="${g.y + 12}" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#fff">${p.n}</text>`;
+        s += `<text x="${g.x - 6}" y="${g.y + 12}" text-anchor="end" font-family="JetBrains Mono" font-size="${fs}" fill="${C.ink}"><tspan fill="${C.muted}" font-size="9">${esc(p.h)}  </tspan>${esc(p.nm)}</text>`;
+      } else if (g.side === 'R') {
+        s += `<text x="${g.x + g.w / 2}" y="${g.y + 12}" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#fff">${p.n}</text>`;
+        s += `<text x="${g.x + g.w + 6}" y="${g.y + 12}" font-family="JetBrains Mono" font-size="${fs}" fill="${C.ink}">${esc(p.nm)}<tspan fill="${C.muted}" font-size="9">  ${esc(p.h)}</tspan></text>`;
+      } else {
+        s += `<text x="${g.x + 8}" y="${g.y + 18}" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#fff">${p.n}</text>`;
+        s += `<text transform="translate(${g.x + 12},${g.y + g.h + 6}) rotate(90)" font-family="JetBrains Mono" font-size="10" fill="${C.ink}">${esc(p.nm)}</text>`;
+      }
+    }
+    s += `</g>`;
+  });
+  s += `</svg>`;
+  $('#pinSvgBox').innerHTML = s;
+  $$('#pinSvgBox .pad').forEach(el => {
+    const go = () => { pinSel = +el.dataset.pin; buildPinSvg(); pinDetail(); };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+}
+function pinDetail() {
+  const p = PINS.find(q => q.n === pinSel);
+  const chips = p.t.map(t => { const f = PF.find(z => z[0] === t); return `<span class="pill" style="color:${C[f[2]]}">${f[1]}</span>`; }).join(' ');
+  let code = '';
+  if (p.t.includes('flash')) code = '# No usar: este pin pertenece a la flash interna';
+  else if (p.g !== undefined) {
+    code = `from machine import Pin\n`;
+    if (p.t.includes('in')) code += `from machine import ADC\nadc = ADC(Pin(${p.g}))\nadc.atten(ADC.ATTN_11DB)\nprint(adc.read_uv())`;
+    else {
+      code += `p = Pin(${p.g}, Pin.OUT)\np.value(1)`;
+      if (p.t.includes('pwm')) code += `\n\nfrom machine import PWM\npwm = PWM(Pin(${p.g}), freq=1000, duty_u16=32768)`;
+      if (p.t.includes('dac')) code += `\n\nfrom machine import DAC\nDAC(Pin(${p.g})).write(128)   # ≈1.65 V`;
+      if (p.t.includes('touch')) code += `\n\nfrom machine import TouchPad\nprint(TouchPad(Pin(${p.g})).read())   # baja al tocar`;
+      if (p.t.includes('adc1') || p.t.includes('adc2')) code += `\n\nfrom machine import ADC\nadc = ADC(Pin(${p.g}))${p.t.includes('adc2') ? '   # falla con Wi-Fi activo' : ''}`;
+    }
+  }
+  $('#pinDetail').innerHTML = `
+    <div class="lab-title"><h3>Pin ${p.n} · ${esc(p.nm)}</h3><span class="tag">${p.g !== undefined ? 'GPIO' + p.g : 'sin GPIO'}</span></div>
+    <div class="row">${chips || '<span class="pill">sin funciones</span>'}</div>
+    <ul class="clean">${p.fn.map(f => `<li class="mono" style="font-size:.82rem">${esc(f)}</li>`).join('')}</ul>
+    ${p.note ? `<p class="note">${esc(p.note)}</p>` : ''}
+    ${code ? `<pre class="code">${esc(code)}</pre>` : ''}`;
+}
+function buildPinFilters() {
+  $('#pinFilters').innerHTML = PF.map(f => `<button class="chip" data-f="${f[0]}" aria-pressed="${pinFilter === f[0]}"><i style="background:${C[f[2]]}"></i>${f[1]} · ${PINS.filter(p => p.t.includes(f[0])).length}</button>`).join('');
+  $$('#pinFilters .chip').forEach(b => b.onclick = () => { pinFilter = pinFilter === b.dataset.f ? null : b.dataset.f; buildPinFilters(); buildPinSvg(); });
+}
+onShow.pines = () => { buildPinFilters(); buildPinSvg(); pinDetail(); };
+
+/* ============ 02 ADC ============ */
+const ATT = [
+  { fs: 1100, lo: 100, hi: 950, tb: [[0, 0], [60, 0], [950, .86], [1080, .99], [1100, 1]] },
+  { fs: 1500, lo: 100, hi: 1250, tb: [[0, 0], [80, 0], [1250, .83], [1450, .98], [1500, 1]] },
+  { fs: 2200, lo: 150, hi: 1750, tb: [[0, 0], [120, 0], [1750, .79], [2100, .97], [2200, 1]] },
+  { fs: 3300, lo: 150, hi: 2450, tb: [[0, 0], [140, 0], [2450, .735], [2900, .9], [3150, 1]] }
+];
+function interp(tb, v) { if (v <= tb[0][0]) return tb[0][1]; for (let i = 1; i < tb.length; i++) if (v <= tb[i][0]) { const a = tb[i - 1], b = tb[i]; return a[1] + (b[1] - a[1]) * (v - a[0]) / (b[0] - a[0]); } return 1; }
+function invInterp(tb, f) { for (let i = 1; i < tb.length; i++) if (f <= tb[i][1] && tb[i][1] > tb[i - 1][1]) { const a = tb[i - 1], b = tb[i]; return a[0] + (b[0] - a[0]) * (f - a[1]) / (b[1] - a[1]); } return tb[tb.length - 1][0]; }
+const adcHist = [];
+let adcLastRaw = 0;
+function adcSample() {
+  const v = +$('#adcV').value * 1000, a = ATT[+$('#adcAtt').value], bits = +$('#adcBits').value, max = 2 ** bits - 1;
+  const N = +$('#adcAvg').value, noisy = $('#adcNoise').checked;
+  let acc = 0;
+  for (let i = 0; i < N; i++) acc += clamp(interp(a.tb, v) * max + (noisy ? gauss() * 14 * max / 4095 : 0), 0, max);
+  return { raw: Math.round(acc / N), v, a, bits, max };
+}
+function adcUpdate(live) {
+  $('#adcVo').textContent = (+$('#adcV').value).toFixed(2) + ' V';
+  $('#adcAvgo').textContent = $('#adcAvg').value;
+  const s = adcSample(); adcLastRaw = s.raw;
+  adcHist.push([s.v, s.raw]); if (adcHist.length > 60) adcHist.shift();
+  const blocked = $('#adcUnit').value === '2' && $('#adcWifi').checked;
+  const naive = s.raw / s.max * 3300, cal = invInterp(s.a.tb, s.raw / s.max);
+  const inRange = s.v >= s.a.lo && s.v <= s.a.hi;
+  $('#adcOut').innerHTML = blocked
+    ? `<span class="pill bad">ESP_ERR_TIMEOUT</span><span>ADC2 está ocupado por el controlador de radio Wi-Fi. Usa un pin del ADC1 (GPIO32–39) o lee antes de activar el Wi-Fi.</span>`
+    : `<div class="kv"><span>Código crudo</span><span><b>${s.raw}</b> / ${s.max}</span>
+       <span>raw·3.3/${s.max}</span><span>${naive.toFixed(0)} mV · error ${(naive - s.v).toFixed(0)} mV</span>
+       <span>Calibrado (eFuse)</span><span>${cal.toFixed(0)} mV · error ${(cal - s.v).toFixed(0)} mV</span>
+       <span>LSB nominal</span><span>${(s.a.fs / (s.max + 1)).toFixed(2)} mV</span>
+       <span>Zona lineal</span><span>${inRange ? '<span class="pill ok">dentro</span>' : '<span class="pill warn">fuera: lectura poco fiable</span>'}</span></div>`;
+  adcDraw(blocked);
+}
+function adcDraw(blocked) {
+  const { x, w, h } = fit($('#adcCv')); const s = adcSample(); const a = s.a;
+  const L = 44, R = 12, T = 12, B = 28, pw = w - L - R, ph = h - T - B;
+  const X = mv => L + mv / 3300 * pw, Y = f => T + ph - f * ph;
+  x.clearRect(0, 0, w, h);
+  x.fillStyle = rgba(C.ok, .1); x.fillRect(X(a.lo), T, X(a.hi) - X(a.lo), ph);
+  x.strokeStyle = C.line; x.lineWidth = 1;
+  for (let i = 0; i <= 6; i++) { const mv = i * 550; x.beginPath(); x.moveTo(X(mv), T); x.lineTo(X(mv), T + ph); x.stroke(); axisText(x, (mv / 1000).toFixed(2), X(mv), h - 10, 'center'); }
+  for (let i = 0; i <= 4; i++) { const f = i / 4; x.beginPath(); x.moveTo(L, Y(f)); x.lineTo(L + pw, Y(f)); x.stroke(); axisText(x, Math.round(f * s.max), L - 4, Y(f) + 3, 'right'); }
+  axisText(x, 'V entrada', L + pw, h - 10, 'right');
+  x.setLineDash([5, 4]); x.strokeStyle = C.muted; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X(0), Y(0)); x.lineTo(X(Math.min(3300, a.fs)), Y(Math.min(1, 3300 / a.fs))); x.stroke(); x.setLineDash([]);
+  x.strokeStyle = C.pcb; x.lineWidth = 2.2; x.beginPath();
+  for (let mv = 0; mv <= 3300; mv += 10) { const f = interp(a.tb, mv); mv ? x.lineTo(X(mv), Y(f)) : x.moveTo(X(mv), Y(f)); } x.stroke();
+  x.fillStyle = rgba(C.copper, .35);
+  adcHist.forEach(([v, r]) => { x.beginPath(); x.arc(X(v), Y(r / s.max), 2, 0, 7); x.fill(); });
+  x.fillStyle = blocked ? C.bad : C.copper; x.beginPath(); x.arc(X(s.v), Y(adcLastRaw / s.max), 5, 0, 7); x.fill();
+  axisText(x, 'ideal', X(a.fs * .5) + 6, Y(.5) - 8, 'left', C.muted);
+  axisText(x, 'real ESP32', X(a.lo) + 4, T + 12, 'left', C.pcb);
+}
+['adcV', 'adcAtt', 'adcBits', 'adcUnit', 'adcAvg', 'adcWifi', 'adcNoise'].forEach(id => $('#' + id).addEventListener('input', () => { adcHist.length = 0; adcUpdate(); }));
+
+/* ============ 02 DAC ============ */
+function dacWaveF(type, p) { // p en [0,1)
+  if (type === 'sin') return Math.sin(2 * Math.PI * p);
+  if (type === 'tri') return p < .5 ? 4 * p - 1 : 3 - 4 * p;
+  if (type === 'saw') return 2 * p - 1;
+  if (type === 'sq') return p < .5 ? 1 : -1;
+  return 0;
+}
+function dacUpdate() {
+  const type = $('#dacWave').value, A = +$('#dacVal').value, N = +$('#dacSps').value, f = 10 ** +$('#dacFreq').value;
+  $('#dacValo').textContent = A; $('#dacSpso').textContent = N; $('#dacFreqo').textContent = fmtHz(f);
+  const code = p => type === 'dc' ? A : clamp(Math.round(127.5 + dacWaveF(type, p) * A / 2), 0, 255);
+  const { x, w, h } = fit($('#dacCv')); const L = 40, R = 10, T = 10, B = 22, pw = w - L - R, ph = h - T - B;
+  const X = t => L + t / 2 * pw, Y = v => T + ph - v / 3.3 * ph;
+  x.clearRect(0, 0, w, h); x.strokeStyle = C.line; x.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) { const v = i * 1.1; x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(L + pw, Y(v)); x.stroke(); axisText(x, v.toFixed(1) + 'V', L - 4, Y(v) + 3, 'right'); }
+  axisText(x, '2 periodos', L + pw, h - 6, 'right');
+  if (type !== 'dc') { x.setLineDash([4, 4]); x.strokeStyle = C.muted; x.beginPath(); for (let i = 0; i <= 400; i++) { const t = i / 200, v = 3.3 * (127.5 + dacWaveF(type, t % 1) * A / 2) / 255; i ? x.lineTo(X(t), Y(v)) : x.moveTo(X(t), Y(v)); } x.stroke(); x.setLineDash([]); }
+  x.strokeStyle = C.copper; x.lineWidth = 2; x.beginPath();
+  for (let k = 0; k < 2 * N; k++) { const t0 = k / N, t1 = (k + 1) / N, v = 3.3 * code((k % N) / N) / 255; k ? x.lineTo(X(t0), Y(v)) : x.moveTo(X(t0), Y(v)); x.lineTo(X(t1), Y(v)); }
+  x.stroke();
+  x.fillStyle = C.copper; for (let k = 0; k < 2 * N; k++) { const v = 3.3 * code((k % N) / N) / 255; x.beginPath(); x.arc(X(k / N), Y(v), 2.2, 0, 7); x.fill(); }
+  const fs = f * N, vmax = 3.3 * code(type === 'saw' ? .999 : .25) / 255, vmin = 3.3 * code(type === 'saw' ? 0 : .75) / 255;
+  $('#dacOut').innerHTML = `<div class="kv"><span>Salida</span><span>${type === 'dc' ? `<b>${(3.3 * A / 255).toFixed(3)} V</b> (código ${A})` : `<b>${(vmax - vmin).toFixed(2)} Vpp</b> centrada en 1.65 V`}</span>
+    <span>Paso (1 LSB)</span><span>3.3 V / 255 = 12.9 mV</span>
+    <span>Muestreo requerido</span><span>${type === 'dc' ? '—' : fmtHz(fs) + ' (' + N + ' muestras × ' + fmtHz(f) + ')'}</span>
+    <span>Viabilidad</span><span>${type === 'dc' ? '<span class="pill ok">nivel estático</span>' : fs <= 1e5 ? '<span class="pill ok">alcanzable con temporizador + dac.write()</span>' : fs <= 1e6 ? '<span class="pill warn">requiere I2S + DMA</span>' : '<span class="pill bad">fuera de alcance; usa el generador coseno de hardware</span>'}</span></div>`;
+}
+['dacWave', 'dacVal', 'dacSps', 'dacFreq'].forEach(id => $('#' + id).addEventListener('input', dacUpdate));
+
+/* ============ 02 PWM ============ */
+function pwmUpdate() {
+  const f = 10 ** +$('#pwmFreq').value, bits = +$('#pwmBits').value, d = +$('#pwmDuty').value / 100;
+  $('#pwmFreqo').textContent = fmtHz(f); $('#pwmBitso').textContent = bits + ' bits'; $('#pwmDutyo').textContent = d * 100 + ' %';
+  const maxBits = Math.min(20, Math.floor(Math.log2(80e6 / f)));
+  const ok = f * 2 ** bits <= 80e6 && maxBits >= 1;
+  const steps = 2 ** bits, reg = Math.round(d * steps), dq = reg / steps, T = 1 / f;
+  const { x, w, h } = fit($('#pwmCv')); x.clearRect(0, 0, w, h);
+  const L = 10, R = 10, top = 22, bot = h - 26;
+  if (!ok) {
+    x.strokeStyle = C.bad; x.lineWidth = 2; x.beginPath(); x.moveTo(L, bot); x.lineTo(w - R, bot); x.stroke();
+    axisText(x, 'ledc: la frecuencia y la resolución pedidas no son alcanzables', w / 2, h / 2, 'center', C.bad, 11);
+  } else {
+    x.strokeStyle = C.line; x.setLineDash([3, 4]); x.beginPath(); x.moveTo(L, top); x.lineTo(w - R, top); x.stroke(); x.setLineDash([]);
+    x.strokeStyle = C.pcb; x.lineWidth = 2.2; x.beginPath(); const pw = (w - L - R) / 3; x.moveTo(L, bot);
+    for (let k = 0; k < 3; k++) { const x0 = L + k * pw; if (dq > 0) { x.lineTo(x0, top); x.lineTo(x0 + pw * dq, top); } x.lineTo(x0 + pw * dq, bot); x.lineTo(x0 + pw, bot); }
+    x.stroke();
+    x.fillStyle = rgba(C.pcb, .12); for (let k = 0; k < 3; k++) x.fillRect(L + k * pw, top, pw * dq, bot - top);
+    axisText(x, '3.3 V', L + 2, top - 6); axisText(x, 'T = ' + fmtT(T), w - R, h - 8, 'right'); axisText(x, 't_on = ' + fmtT(T * dq), L, h - 8);
+    x.strokeStyle = C.copper; x.lineWidth = 1.5; x.setLineDash([6, 4]); const ya = bot - (bot - top) * dq; x.beginPath(); x.moveTo(L, ya); x.lineTo(w - R, ya); x.stroke(); x.setLineDash([]);
+    axisText(x, 'media ' + (3.3 * dq).toFixed(2) + ' V', w - R, ya - 4, 'right', C.copper);
+  }
+  const led = $('#pwmLed'); const lum = ok ? Math.pow(dq, 1 / 2.2) : 0;
+  led.style.background = `color-mix(in srgb, ${C.gold} ${Math.round(lum * 100)}%, ${C.soft})`;
+  led.style.boxShadow = lum > .05 ? `0 0 ${Math.round(lum * 22)}px ${rgba(C.gold, lum * .9)}` : 'none';
+  $('#pwmVavg').textContent = ok ? (3.3 * dq).toFixed(2) + ' V' : '—';
+  let servoTxt = 'servo: requiere 50 Hz', ang = 90;
+  if (ok && f >= 40 && f <= 70) { const pwMs = dq * T * 1000; ang = clamp((pwMs - 0.5) / 2 * 180, 0, 180); servoTxt = `${pwMs.toFixed(2)} ms → ${ang.toFixed(0)}°` + (pwMs < .5 || pwMs > 2.5 ? ' (fuera de 0.5–2.5 ms)' : ''); }
+  const rad = (180 - ang) * Math.PI / 180; $('#pwmNeedle').setAttribute('x2', 35 + 28 * Math.cos(rad)); $('#pwmNeedle').setAttribute('y2', 40 - 28 * Math.sin(rad));
+  $('#pwmServoTxt').textContent = servoTxt;
+  $('#pwmOut').innerHTML = `<div class="kv"><span>Estado</span><span>${ok ? '<span class="pill ok">configuración válida</span>' : `<span class="pill bad">f · 2^bits = ${fmtHz(f * 2 ** bits)} &gt; 80 MHz (APB)</span>`}</span>
+    <span>Resolución máx. a esta f</span><span>${maxBits >= 1 ? maxBits + ' bits' : 'ninguna'}</span>
+    <span>Registro de duty</span><span>${reg} / ${steps}</span>
+    <span>Paso mínimo de duty</span><span>${(100 / steps).toPrecision(3)} %</span>
+    <span>Regla</span><span>f_max = 80 MHz / 2^bits</span></div>`;
+}
+['pwmFreq', 'pwmBits', 'pwmDuty'].forEach(id => $('#' + id).addEventListener('input', pwmUpdate));
+function pwmPreset(f, b, d) { $('#pwmFreq').value = Math.log10(f); $('#pwmBits').value = b; $('#pwmDuty').value = d; pwmUpdate(); }
+$('#pwmServo').onclick = () => pwmPreset(50, 16, 7.5);
+$('#pwmLedBtn').onclick = () => pwmPreset(5000, 13, 35);
+$('#pwmMotor').onclick = () => pwmPreset(20000, 11, 60);
+onShow.senales = () => { adcUpdate(); dacUpdate(); pwmUpdate(); };
+let adcTick = 0;
+anim.senales = dt => { adcTick += dt; if (adcTick > 160) { adcTick = 0; if ($('#adcNoise').checked) adcUpdate(); } };
+/* ============ 03 OSI ============ */
+const OSI = {
+  wifi: { name: 'Wi-Fi 802.11 b/g/n', col: 'info', L: [
+    [7, 'Aplicación', 'MQTT, HTTP, CoAP, WebSocket', 'esp-mqtt, esp_http_client, PubSubClient', 'MQTT PUB'],
+    [6, 'Presentación', 'TLS 1.2/1.3 + JSON/CBOR', 'mbedTLS sobre el acelerador AES/SHA', 'TLS'],
+    [5, 'Sesión', 'Sesión TLS y keep-alive MQTT', 'reconexión, clean session, QoS', null],
+    [4, 'Transporte', 'TCP / UDP', 'pila lwIP: puertos, ventana, retransmisión', 'TCP'],
+    [3, 'Red', 'IPv4/IPv6, ICMP, ARP, DHCP', 'lwIP + esp_netif', 'IP'],
+    [2, 'Enlace', 'MAC 802.11, WPA2/WPA3, LLC', 'controlador Wi-Fi de Espressif', 'MAC'],
+    [1, 'Física', '2.4 GHz OFDM/DSSS, canales 1–13', 'radio integrada + antena PCB, hasta +20 dBm', 'PHY']],
+    note: 'Wi-Fi es la única pila del ESP32 que cubre las siete capas con protocolos estándar de Internet. La capa de sesión no añade cabecera: es estado que mantienen TLS y MQTT.' },
+  bt: { name: 'Bluetooth clásico (BR/EDR)', col: 'vio', L: [
+    [7, 'Aplicación', 'Perfiles SPP, A2DP, AVRCP, HFP', 'BluetoothSerial (Arduino), Bluedroid', 'SPP'],
+    [6, 'Presentación', 'Códec SBC (audio) o bytes crudos', 'SDP describe los servicios ofrecidos', null],
+    [5, 'Sesión', 'RFCOMM: emula un puerto serie', 'canales multiplexados sobre L2CAP', 'RFCOMM'],
+    [4, 'Transporte', 'L2CAP: segmentación y reensamblado', 'canales lógicos, MTU', 'L2CAP'],
+    [3, 'Red', 'No aplica', 'una piconet no se enruta', null, true],
+    [2, 'Enlace', 'Banda base + LMP, enlaces ACL/SCO', 'controlador BT del ESP32', 'ACL'],
+    [1, 'Física', 'GFSK / π/4-DQPSK, 79 canales de 1 MHz', 'salto de frecuencia, 1600 saltos/s', 'BR/EDR']],
+    note: 'Bluetooth clásico agrupa varias funciones en L2CAP y RFCOMM, así que el ajuste a OSI es aproximado. No hay capa de red: la piconet es un maestro con hasta 7 esclavos activos.' },
+  ble: { name: 'Bluetooth Low Energy 4.2', col: 'ok', L: [
+    [7, 'Aplicación', 'GATT: servicios y características', 'p. ej. Environmental Sensing 0x181A', 'GATT'],
+    [6, 'Presentación', 'ATT: valores con handle y UUID', 'notificaciones e indicaciones', 'ATT'],
+    [5, 'Sesión', 'GAP + SMP: anuncio, conexión, emparejamiento', 'LE Secure Connections', null],
+    [4, 'Transporte', 'L2CAP (canal fijo 0x0004 para ATT)', 'MTU por defecto 23 B', 'L2CAP'],
+    [3, 'Red', 'No aplica en BLE 4.2', 'la malla BLE llega como perfil aparte', null, true],
+    [2, 'Enlace', 'Link Layer: PDU, CRC-24, AES-CCM', 'estados: anuncio, escaneo, conexión', 'LL'],
+    [1, 'Física', 'LE 1M PHY GFSK, 40 canales de 2 MHz', 'anuncio en los canales 37, 38 y 39', 'LE 1M']],
+    note: 'BLE ahorra energía porque la radio solo se enciende en eventos de conexión breves. El ESP32 actúa como periférico (servidor GATT) o como central.' },
+  now: { name: 'ESP-NOW', col: 'copper', L: [
+    [7, 'Aplicación', 'Callbacks esp_now_send / recv_cb', 'tu propio protocolo de mensajes', 'APP'],
+    [6, 'Presentación', 'Estructura binaria ≤ 250 B', 'struct.pack en MicroPython', null],
+    [5, 'Sesión', 'No aplica: sin conexión', 'lista de pares por MAC (hasta 20)', null, true],
+    [4, 'Transporte', 'No aplica', 'sin puertos ni retransmisión de extremo a extremo; ACK de capa 2', null, true],
+    [3, 'Red', 'No aplica', 'sin IP: se direcciona por MAC', null, true],
+    [2, 'Enlace', 'Trama 802.11 de acción, específica de proveedor', 'OUI de Espressif + CCMP opcional (PMK/LMK)', 'ACTION'],
+    [1, 'Física', 'La misma radio 2.4 GHz del Wi-Fi', '1 Mbps; modo LR para más alcance', 'PHY']],
+    note: 'ESP-NOW salta de la aplicación directamente a la capa de enlace. Por eso tiene latencia de pocos milisegundos y no necesita punto de acceso, a cambio de no tener enrutamiento ni garantías de transporte.' }
+};
+let osiTech = 'wifi', osiAnim = null, osiT = 0, osiPkt = null;
+const PDU_COL = ['info', 'vio', 'ok', 'copper', 'pcb', 'warn', 'muted'];
+function osiBuild() {
+  $('#osiTech').innerHTML = Object.entries(OSI).map(([k, v]) => `<button class="chip" data-k="${k}" aria-pressed="${k === osiTech}"><i style="background:${C[v.col]}"></i>${v.name}</button>`).join('');
+  $$('#osiTech .chip').forEach(b => b.onclick = () => { osiTech = b.dataset.k; osiAnim = null; osiPkt = null; osiBuild(); });
+  const T = OSI[osiTech];
+  $('#osiTitle').textContent = T.name;
+  $('#osiStack').innerHTML = T.L.map(l => `<div class="layer${l[5] ? ' na' : ''}" data-l="${l[0]}"><span class="n">${l[0]}</span><span class="nm">${l[1]}</span><span class="impl">${esc(l[2])}<small>${esc(l[3])}</small></span><span class="pdu"></span></div>`).join('');
+  $('#osiNote').textContent = T.note;
+  const info = {
+    wifi: ['Asociación', 'WPA2-PSK + DHCP ≈ 1–3 s', 'Latencia', '5–30 ms al broker local', 'Código', 'WiFi.begin(ssid, pass); mqtt.publish("planta/temp", "24.5");'],
+    bt: ['Emparejamiento', 'SSP con PIN o Just Works', 'Latencia', '15–40 ms', 'Código', 'SerialBT.begin("ESP32-planta"); SerialBT.println("temp=24.5");'],
+    ble: ['Anuncio', 'cada 20 ms–10 s en 37/38/39', 'Latencia', 'intervalo de conexión 7.5 ms–4 s', 'Código', 'pChar->setValue(t); pChar->notify();'],
+    now: ['Conexión previa', 'ninguna, solo add_peer(mac)', 'Latencia', '1–3 ms por trama', 'Código', 'esp_now_send(mac, (uint8_t*)&dato, sizeof(dato));']
+  }[osiTech];
+  $('#osiInfo').innerHTML = `<div class="kv"><span>${info[0]}</span><span>${info[1]}</span><span>${info[2]}</span><span>${info[3]}</span><span>${info[4]}</span><span>${esc(info[5])}</span></div>`;
+  osiDraw();
+}
+function osiSend() {
+  if (osiAnim) return;
+  const T = OSI[osiTech]; const steps = [];
+  T.L.forEach((l, i) => steps.push({ i, dir: 'down' }));
+  steps.push({ air: true });
+  [...T.L].reverse().forEach((l, k) => steps.push({ i: T.L.length - 1 - k, dir: 'up' }));
+  osiAnim = { steps, k: 0, t: 0 };
+  $$('#osiStack .pdu').forEach(p => p.innerHTML = '');
+}
+function osiPdu(upto) {
+  const T = OSI[osiTech]; let s = '';
+  for (let j = upto; j >= 0; j--) { const h = T.L[j][4]; if (h) s += `<span style="background:${C[PDU_COL[j]]}">${h}</span>`; }
+  return s + `<span style="background:${C.ink};color:${C.panel}">temp=24.5</span>`;
+}
+function osiStep(dt) {
+  if (!osiAnim) return;
+  osiAnim.t += dt; const st = osiAnim.steps[osiAnim.k];
+  const dur = st.air ? 1400 : 380;
+  if (osiAnim.t === dt || osiAnim.t - dt <= 0) {
+    $$('#osiStack .layer').forEach(r => r.classList.remove('hot'));
+    if (!st.air) {
+      const row = $$('#osiStack .layer')[st.i]; row.classList.add('hot');
+      row.querySelector('.pdu').innerHTML = st.dir === 'down' ? osiPdu(st.i) : '<span style="background:' + C.ok + '">recibido ✓</span>';
+    } else osiPkt = { p: 0 };
+  }
+  if (st.air && osiPkt) osiPkt.p = clamp(osiAnim.t / dur, 0, 1);
+  if (osiAnim.t >= dur) {
+    osiAnim.k++; osiAnim.t = 0;
+    if (osiAnim.k >= osiAnim.steps.length) { osiAnim = null; osiPkt = null; setTimeout(() => $$('#osiStack .layer').forEach(r => r.classList.remove('hot')), 600); }
+  }
+}
+function node(x, px, py, label, col, w = 78) { x.fillStyle = C.panel; x.strokeStyle = col; x.lineWidth = 2; x.beginPath(); x.roundRect(px - w / 2, py - 15, w, 30, 4); x.fill(); x.stroke(); axisText(x, label, px, py + 4, 'center', C.ink, 10); }
+function osiDraw() {
+  const cv = $('#osiCv'); const { x, w, h } = fit(cv); x.clearRect(0, 0, w, h);
+  const t = osiT / 1000, col = C[OSI[osiTech].col];
+  const lerp = (a, b, p) => [a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p];
+  const dot = (p, r = 5, c = col) => { x.fillStyle = c; x.beginPath(); x.arc(p[0], p[1], r, 0, 7); x.fill(); };
+  const line = (a, b, dash) => { x.strokeStyle = C.line; x.lineWidth = 1.5; x.setLineDash(dash ? [4, 4] : []); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); x.setLineDash([]); };
+  if (osiTech === 'wifi') {
+    const esp = [[w * .14, h * .2], [w * .14, h * .5], [w * .14, h * .8]], ap = [w * .5, h * .5], cloud = [w * .84, h * .5];
+    esp.forEach(e => line(e, ap, true)); line(ap, cloud);
+    esp.forEach((e, i) => { const p = (t * .6 + i * .33) % 1; dot(lerp(e, ap, p), 3, rgba(col, .6)); });
+    const pc = (t * .5) % 1; dot(lerp(ap, cloud, pc), 3, rgba(col, .6));
+    if (osiPkt) dot(osiPkt.p < .5 ? lerp(esp[1], ap, osiPkt.p * 2) : lerp(ap, cloud, (osiPkt.p - .5) * 2), 7, C.copper);
+    esp.forEach((e, i) => node(x, e[0], e[1], 'ESP32 STA' + (i + 1), col, 84)); node(x, ap[0], ap[1], 'Router AP', C.muted); node(x, cloud[0], cloud[1], 'Broker MQTT', C.muted, 90);
+    axisText(x, 'canal 6 · 2437 MHz', ap[0], ap[1] + 34, 'center');
+  } else if (osiTech === 'bt') {
+    const m = [w * .5, h * .42]; const sl = []; for (let i = 0; i < 7; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 7; sl.push([m[0] + Math.cos(a) * w * .3, m[1] + Math.sin(a) * h * .3]); }
+    sl.forEach(s => line(m, s, true));
+    if (osiPkt) dot(lerp(sl[0], m, osiPkt.p), 7, C.copper);
+    node(x, m[0], m[1], 'Maestro', col, 70); sl.forEach((s, i) => node(x, s[0], s[1], i === 0 ? 'ESP32' : 'esclavo ' + (i + 1), i === 0 ? C.copper : C.muted, 62));
+    const by = h - 18, ch = Math.floor((t * 160) % 79 * 7919) % 79;
+    for (let c = 0; c < 79; c++) { x.fillStyle = c === ch ? col : C.line; x.fillRect(16 + c * (w - 32) / 79, by - (c === ch ? 12 : 4), (w - 32) / 79 - 1, c === ch ? 12 : 4); }
+    axisText(x, 'salto de frecuencia: canal ' + ch, w / 2, by - 16, 'center');
+  } else if (osiTech === 'ble') {
+    const per = [w * .25, h * .42], cen = [w * .75, h * .42];
+    const ph = Math.floor(t * 3) % 3; const rr = (t * 3 % 1) * 70;
+    x.strokeStyle = rgba(col, 1 - rr / 70); x.lineWidth = 2; x.beginPath(); x.arc(per[0], per[1], rr + 18, 0, 7); x.stroke();
+    line(per, cen, true);
+    if (osiPkt) dot(lerp(per, cen, osiPkt.p), 7, C.copper);
+    node(x, per[0], per[1], 'ESP32 periférico', col, 104); node(x, cen[0], cen[1], 'Central (móvil)', C.muted, 100);
+    const by = h - 18; const advIdx = [0, 12, 39];
+    for (let c = 0; c < 40; c++) { const adv = c === 0 || c === 12 || c === 39; const on = advIdx[ph] === c; x.fillStyle = on ? col : adv ? rgba(col, .4) : C.line; x.fillRect(16 + c * (w - 32) / 40, by - (on ? 12 : 4), (w - 32) / 40 - 2, on ? 12 : 4); }
+    axisText(x, 'anuncio en canal ' + [37, 38, 39][ph] + ' (frecuencias 2402 / 2426 / 2480 MHz)', w / 2, by - 16, 'center');
+  } else {
+    const ps = [[w * .2, h * .25], [w * .5, h * .15], [w * .8, h * .3], [w * .3, h * .7], [w * .7, h * .75]];
+    const src = ps[0]; const rr = (t * 1.2 % 1) * w * .7;
+    x.strokeStyle = rgba(col, Math.max(0, .7 - rr / (w * .7))); x.lineWidth = 2; x.beginPath(); x.arc(src[0], src[1], rr, 0, 7); x.stroke();
+    ps.forEach((a, i) => ps.forEach((b, j) => { if (j > i) line(a, b, true); }));
+    if (osiPkt) dot(lerp(src, ps[4], osiPkt.p), 7, C.copper);
+    ps.forEach((p, i) => node(x, p[0], p[1], 'ESP32 #' + (i + 1), i === 0 ? C.copper : col, 70));
+    axisText(x, 'sin punto de acceso · broadcast a FF:FF:FF:FF:FF:FF', w / 2, h - 12, 'center');
+  }
+}
+$('#osiSend').onclick = osiSend;
+onShow.osi = osiBuild;
+anim.osi = dt => { osiT += dt; osiStep(dt); osiDraw(); };
+
+/* ============ 04 INTERRUPCIONES ============ */
+const ISR = { t: 0, edges: [], level: [[0, 1]], isr: [], task: [], ticks: [], busy: 0, pend: 0, lastAcc: -1e9, nInt: 0, nValid: 0, nFilt: 0, nLost: 0, nextTick: 250, wdt: -1e9, chainStart: null, stolen: 0 };
+const ISR_WIN = 3000;
+function isrPress() {
+  const t = ISR.t + 5, b = $('#isrBounce').checked;
+  const ev = b ? [[0, 0], [6, 1], [13, 0], [22, 1], [31, 0], [220, 1], [227, 0], [235, 1]] : [[0, 0], [220, 1]];
+  ev.forEach(([d, l]) => ISR.edges.push([t + d, l])); ISR.edges.sort((a, b) => a[0] - b[0]);
+}
+function isrRun(t0, src) {
+  const heavy = $('#isrMode').value === 'heavy';
+  const dur = heavy ? (src === 'btn' ? 70 : 2) : 3;
+  const start = Math.max(t0, ISR.busy);
+  if (ISR.busy <= t0) ISR.chainStart = start;
+  ISR.busy = start + dur; ISR.isr.push([start, ISR.busy, src]); ISR.stolen += dur;
+  if (ISR.busy - ISR.chainStart > 300) { ISR.wdt = ISR.t; isrResetCounters(true); }
+  return start;
+}
+function isrResetCounters(wdt) {
+  Object.assign(ISR, { edges: [], busy: 0, pend: 0, nInt: 0, nValid: 0, nFilt: 0, nLost: 0, stolen: 0, chainStart: null });
+  if (!wdt) ISR.wdt = -1e9;
+}
+function isrAdvance(dt) {
+  const t1 = ISR.t + dt;
+  while (true) {
+    const ne = ISR.edges.length ? ISR.edges[0][0] : Infinity;
+    const nt = $('#isrTimer').checked ? ISR.nextTick : Infinity;
+    const n = Math.min(ne, nt); if (n > t1) break;
+    if (ne <= nt) {
+      const [te, lv] = ISR.edges.shift(); ISR.level.push([te, lv]);
+      if (lv === 0) {
+        ISR.nInt++;
+        const accept = !$('#isrDebounce').checked || te - ISR.lastAcc >= 50;
+        const s = isrRun(te, 'btn');
+        if (accept) { ISR.lastAcc = te; ISR.nValid++; if ($('#isrMode').value === 'light') ISR.task.push([s + 4, s + 16]); }
+        else ISR.nFilt++;
+      }
+    } else {
+      ISR.nextTick += 250;
+      if (ISR.busy > nt) {
+        const pendingAt = ISR.ticks.filter(k => k[1] === 'pend' && k[0] > nt - 250).length;
+        if (ISR.busy - nt > 250 || pendingAt) { ISR.nLost++; ISR.ticks.push([nt, 'lost']); }
+        else { ISR.ticks.push([nt, 'pend']); isrRun(ISR.busy, 'tmr'); }
+      } else { ISR.ticks.push([nt, 'ok']); isrRun(nt, 'tmr'); }
+    }
+  }
+  ISR.t = t1;
+  const cut = ISR.t - ISR_WIN - 300;
+  ISR.isr = ISR.isr.filter(s => s[1] > cut); ISR.task = ISR.task.filter(s => s[1] > cut); ISR.ticks = ISR.ticks.filter(s => s[0] > cut);
+  while (ISR.level.length > 2 && ISR.level[1][0] < cut) ISR.level.shift();
+}
+function isrDraw() {
+  const { x, w, h } = fit($('#isrCv')); x.clearRect(0, 0, w, h);
+  const L = 118, R = 10, lanes = ['GPIO0 (botón)', 'Timer 0', 'ISR en la CPU', 'Tarea / loop()'];
+  const lh = (h - 30) / 4, X = tm => L + (tm - (ISR.t - ISR_WIN)) / ISR_WIN * (w - L - R);
+  lanes.forEach((nm, i) => { const y = 6 + i * lh; x.fillStyle = i % 2 ? 'transparent' : rgba(C.line, .25); x.fillRect(0, y, w, lh); axisText(x, nm, 8, y + lh / 2 + 4, 'left', C.ink, 11); });
+  for (let s = Math.ceil((ISR.t - ISR_WIN) / 500) * 500; s <= ISR.t; s += 500) { const px = X(s); x.strokeStyle = C.line; x.beginPath(); x.moveTo(px, 6); x.lineTo(px, h - 22); x.stroke(); axisText(x, (s / 1000).toFixed(1) + ' s', px, h - 8, 'center'); }
+  // GPIO
+  let y0 = 6, hi = y0 + lh * .25, lo = y0 + lh * .78; x.strokeStyle = C.pcb; x.lineWidth = 2; x.beginPath();
+  let lv = 1; for (const [t, l] of ISR.level) { if (t > ISR.t - ISR_WIN) break; lv = l; }
+  x.moveTo(L, lv ? hi : lo);
+  for (const [t, l] of ISR.level) { if (t <= ISR.t - ISR_WIN || t > ISR.t) continue; const px = X(t); x.lineTo(px, lv ? hi : lo); x.lineTo(px, l ? hi : lo); lv = l; }
+  x.lineTo(w - R, lv ? hi : lo); x.stroke();
+  // timer
+  const ty = 6 + lh; ISR.ticks.forEach(([t, s]) => { const px = X(t); if (px < L) return; x.strokeStyle = s === 'lost' ? C.bad : s === 'pend' ? C.warn : C.info; x.lineWidth = 2; x.beginPath(); x.moveTo(px, ty + lh * .2); x.lineTo(px, ty + lh * .8); x.stroke(); if (s === 'lost') axisText(x, '✕', px, ty + lh * .18, 'center', C.bad, 12); });
+  // ISR
+  const iy = 6 + lh * 2; ISR.isr.forEach(([a, b, src]) => { const xa = Math.max(L, X(a)), xb = Math.max(xa + 2, X(b)); if (xb < L) return; x.fillStyle = src === 'btn' ? C.copper : C.info; x.fillRect(xa, iy + lh * .2, xb - xa, lh * .6); });
+  // tarea
+  const ky = 6 + lh * 3; x.fillStyle = rgba(C.pcb, .25); x.fillRect(L, ky + lh * .3, w - R - L, lh * .4);
+  ISR.isr.forEach(([a, b]) => { const xa = Math.max(L, X(a)), xb = X(b); if (xb < L) return; x.fillStyle = C.soft; x.fillRect(xa, ky + lh * .25, Math.max(2, xb - xa), lh * .5); });
+  ISR.task.forEach(([a, b]) => { const xa = Math.max(L, X(a)), xb = X(b); if (xb < L) return; x.fillStyle = C.ok; x.fillRect(xa, ky + lh * .2, Math.max(3, xb - xa), lh * .6); });
+  if (ISR.t - ISR.wdt < 2500) {
+    x.fillStyle = rgba(C.bad, .9); x.fillRect(L + 10, h / 2 - 22, w - L - 30, 40);
+    axisText(x, 'Guru Meditation Error: Interrupt wdt timeout on CPU1 → reinicio', L + (w - L - 10) / 2, h / 2 + 3, 'center', '#fff', 12);
+  }
+}
+function isrStats() {
+  const heavy = $('#isrMode').value === 'heavy';
+  $('#isrStats').innerHTML = `<div class="kv"><span>Interrupciones por flanco</span><span><b>${ISR.nInt}</b></span>
+  <span>Pulsaciones aceptadas</span><span>${ISR.nValid} ${ISR.nInt > ISR.nValid + ISR.nFilt ? '' : ''}${!$('#isrDebounce').checked && ISR.nValid > 0 && $('#isrBounce').checked ? '<span class="pill warn">cuenta rebotes como pulsaciones</span>' : ''}</span>
+  <span>Rebotes filtrados</span><span>${ISR.nFilt}</span>
+  <span>Ticks de timer perdidos</span><span>${ISR.nLost ? `<span class="pill bad">${ISR.nLost}</span>` : '0'}</span>
+  <span>CPU robada por ISR</span><span>${ISR.stolen} ms</span>
+  <span>Lectura</span><span>${heavy ? 'La ISR pesada dura ~70 ms: el loop se detiene, los ticks del timer se retrasan o se pierden y con rebotes encadenados salta el watchdog de interrupciones (300 ms).' : 'La ISR dura microsegundos (ancho exagerado para verla). El trabajo real lo hace la tarea en verde, fuera del contexto de interrupción.'}</span></div>`;
+}
+$('#isrBtn').onclick = isrPress;
+$('#isrMode').onchange = () => isrResetCounters(false);
+let isrStatT = 0;
+anim.interrupciones = dt => { isrAdvance(dt); isrDraw(); isrStatT += dt; if (isrStatT > 200) { isrStatT = 0; isrStats(); } };
+onShow.interrupciones = () => { isrDraw(); isrStats(); };
+
+/* ============ 05 FREERTOS DOBLE NÚCLEO ============ */
+const RT_BASE = [
+  { id: 'wifi', nm: 'Wi-Fi / lwIP', prio: 23, per: 100, ex: 12, home: 0, col: 'info', i2c: 0 },
+  { id: 'ctrl', nm: 'Control PID', prio: 10, per: 20, ex: 6, home: 1, col: 'copper', i2c: 3 },
+  { id: 'adc', nm: 'Muestreo ADC', prio: 8, per: 10, ex: 2, home: 1, col: 'ok', i2c: 0 },
+  { id: 'mqtt', nm: 'Publicar MQTT', prio: 4, per: 500, ex: 70, home: 0, col: 'vio', i2c: 0 },
+  { id: 'ui', nm: 'Pantalla OLED (I²C)', prio: 3, per: 100, ex: 25, home: 1, col: 'gold', i2c: 15 }
+];
+let RT;
+function rtReset() {
+  RT = { t: 0, tasks: RT_BASE.map(b => ({ ...b, rem: 0, p: 0, rel: 0, miss: 0, maxResp: 0, last: -1, blocked: 0 })), hist: [[], []], busy: [[], []], holder: null, coll: 0, inh: 0, lock: 0 };
+  RT.tasks.find(t => t.id === 'mqtt').ex = +$('#rtosMqtt').value;
+}
+function rtCore(task, mode) { if (mode === 'uni' || mode === 'bad') return 0; if (mode === 'free') return -1; return task.home; }
+function rtTick() {
+  const mode = $('#rtosMode').value, mutex = $('#rtosMutex').checked, t = RT.t;
+  RT.tasks.forEach(k => { if (t % k.per === 0) { if (k.rem > 0) { k.miss++; if (RT.holder === k) RT.holder = null; } k.rem = k.ex; k.p = 0; k.rel = t; } });
+  const used = new Set(); const cores = mode === 'uni' ? [0] : [0, 1];
+  const eff = k => (mutex && RT.holder === k) ? Math.max(k.prio, ...RT.tasks.filter(o => o.blocked === t).map(o => o.prio), k.prio) : k.prio;
+  for (const c of cores) {
+    let cand = RT.tasks.filter(k => k.rem > 0 && !used.has(k) && (rtCore(k, mode) === c || rtCore(k, mode) === -1));
+    let pick = null;
+    cand.sort((a, b) => eff(b) - eff(a) || a.last - b.last);
+    for (const k of cand) {
+      const inI2c = k.p < k.i2c;
+      if (inI2c && mutex && RT.holder && RT.holder !== k && RT.holder.rem > 0) { k.blocked = t; RT.lock++; if (RT.holder.prio < k.prio) RT.inh++; continue; }
+      pick = k; break;
+    }
+    if (pick) {
+      used.add(pick);
+      if (pick.p < pick.i2c) {
+        if (!mutex && RT.holder && RT.holder !== pick && RT.holder.rem > 0 && RT.holder.p < RT.holder.i2c && RT.holder.p > 0) RT.coll++;
+        RT.holder = pick;
+      }
+      pick.rem--; pick.p++; pick.last = t;
+      if (RT.holder === pick && pick.p >= pick.i2c) RT.holder = null;
+      if (pick.rem === 0) pick.maxResp = Math.max(pick.maxResp, t + 1 - pick.rel);
+    }
+    RT.hist[c].push(pick ? pick.col : null); RT.busy[c].push(pick ? 1 : 0);
+    if (RT.hist[c].length > 400) RT.hist[c].shift(); if (RT.busy[c].length > 1000) RT.busy[c].shift();
+  }
+  if (mode === 'uni') { RT.hist[1].push('off'); RT.busy[1].push(0); if (RT.hist[1].length > 400) RT.hist[1].shift(); if (RT.busy[1].length > 1000) RT.busy[1].shift(); }
+  RT.t++;
+}
+function rtDraw() {
+  const { x, w, h } = fit($('#rtosCv')); x.clearRect(0, 0, w, h);
+  const L = 100, R = 10, rows = [['Núcleo 0', 'PRO_CPU'], ['Núcleo 1', 'APP_CPU']], rh = 70;
+  rows.forEach((r, c) => {
+    const y = 16 + c * (rh + 30);
+    axisText(x, r[0], 8, y + 30, 'left', C.ink, 12); axisText(x, r[1], 8, y + 46, 'left', C.muted, 10);
+    const hs = RT.hist[c], cw = (w - L - R) / 400;
+    x.fillStyle = C.bg; x.fillRect(L, y, w - L - R, rh);
+    hs.forEach((col, i) => { if (!col) return; x.fillStyle = col === 'off' ? rgba(C.muted, .2) : C[col]; x.fillRect(L + i * cw, y + 4, Math.ceil(cw), rh - 8); });
+    if (hs[hs.length - 1] === 'off') axisText(x, 'núcleo deshabilitado', L + (w - L - R) / 2, y + rh / 2 + 4, 'center', C.muted, 11);
+    const load = RT.busy[c].length ? RT.busy[c].reduce((a, b) => a + b, 0) / RT.busy[c].length : 0;
+    axisText(x, 'carga ' + (load * 100).toFixed(0) + ' %', w - R, y - 4, 'right', load > .9 ? C.bad : C.muted, 10);
+  });
+  let ly = 16 + 2 * (rh + 30) + 4, lx = 8; x.font = '10px "JetBrains Mono", monospace';
+  RT.tasks.forEach(k => { const tw = 24 + x.measureText(k.nm).width; if (lx + tw > w - 8) { lx = 8; ly += 18; } x.fillStyle = C[k.col]; x.fillRect(lx, ly - 9, 12, 12); axisText(x, k.nm, lx + 16, ly + 1, 'left', C.ink, 10); lx += tw + 12; });
+  axisText(x, '← últimos 400 ms', L, 12, 'left');
+}
+function rtTable() {
+  const mode = $('#rtosMode').value;
+  $('#rtosTbl').innerHTML = `<thead><tr><th>Tarea</th><th>Núcleo</th><th>Prio</th><th>Periodo / WCET</th><th>Resp. máx.</th><th>Plazos perdidos</th></tr></thead><tbody>` +
+    RT.tasks.map(k => { const c = rtCore(k, mode); return `<tr><td><span style="display:inline-block;width:10px;height:10px;background:${C[k.col]};border-radius:2px;margin-right:6px"></span>${k.nm}</td><td class="mono">${c === -1 ? 'cualquiera' : c}</td><td class="mono">${k.prio}</td><td class="mono">${k.per} / ${k.ex} ms</td><td class="mono">${k.maxResp} ms</td><td>${k.miss ? `<span class="pill bad">${k.miss}</span>` : '<span class="pill ok">0</span>'}</td></tr>`; }).join('') + '</tbody>';
+  const util = RT.tasks.reduce((a, k) => a + k.ex / k.per, 0);
+  $('#rtosStats').innerHTML = `<div class="kv"><span>Tiempo simulado</span><span>${(RT.t / 1000).toFixed(1)} s</span>
+  <span>Utilización total</span><span>${(util * 100).toFixed(0)} % de un núcleo ${util > 1 ? '<span class="pill warn">no cabe en un solo núcleo</span>' : ''}</span>
+  <span>Esperas por mutex</span><span>${RT.lock} ms ${RT.inh ? `(herencia de prioridad aplicada ${RT.inh} veces)` : ''}</span>
+  <span>Colisiones en I²C</span><span>${RT.coll ? `<span class="pill bad">${RT.coll} transacciones corruptas</span>` : '<span class="pill ok">0</span>'}</span>
+  <span>Lectura</span><span>${{ uni: 'Todo compite en un núcleo: el Wi-Fi (prioridad 23) retrasa al muestreo y aparecen plazos perdidos.', pin: 'La radio vive en el núcleo 0 y el control determinista en el 1: cada núcleo queda holgado.', free: 'El planificador reparte las tareas donde haya hueco: buen rendimiento promedio, pero menos predecible y con caché fría al migrar.', bad: 'Fijar todo al núcleo 0 desperdicia el núcleo 1 y mezcla el control con la radio.' }[mode]}</span></div>`;
+}
+$('#rtosMode').onchange = rtReset; $('#rtosMutex').onchange = rtReset; $('#rtosReset').onclick = rtReset;
+$('#rtosMqtt').oninput = () => { $('#rtosMqtto').textContent = $('#rtosMqtt').value + ' ms'; rtReset(); };
+let rtTabT = 0;
+anim.nucleos = dt => { if (!RT) rtReset(); for (let i = 0; i < 3; i++) rtTick(); rtDraw(); rtTabT += dt; if (rtTabT > 300) { rtTabT = 0; rtTable(); } };
+onShow.nucleos = () => { if (!RT) rtReset(); $('#rtosMqtto').textContent = $('#rtosMqtt').value + ' ms'; rtDraw(); rtTable(); };
+/* ============ 06 DOCKER INDUSTRIAL ============ */
+const DK = {
+  on: { mosquitto: true, nodered: true, influxdb: true, grafana: true, ota: true },
+  nodes: [{ nm: 'ESP32 horno', buf: 0, ver: '1.2', next: 300 }, { nm: 'ESP32 caldera', buf: 0, ver: '1.2', next: 500 }, { nm: 'ESP32 bomba', buf: 0, ver: '1.2', next: 700 }, { nm: 'ESP32 compresor', buf: 0, ver: '1.2', next: 900 }],
+  parts: [], pub: 0, stored: 0, lost: 0, nrErr: 0, noSub: 0, serie: [], ota: null, t: 0, tempBase: 182
+};
+const DK_POS = { mosquitto: [.44, .5], nodered: [.62, .26], influxdb: [.82, .26], grafana: [.82, .74], ota: [.62, .78], idf: [.44, .88] };
+const DK_NAME = { mosquitto: 'eclipse-mosquitto', nodered: 'node-red', influxdb: 'influxdb', grafana: 'grafana', ota: 'nginx (OTA)' };
+function dkPos(k, w, h) { if (typeof k === 'number') return [w * .11, h * (.16 + k * .23)]; const p = DK_POS[k]; return [w * p[0], h * p[1]]; }
+function dkBuildCtl() {
+  $('#dockCtl').innerHTML = Object.keys(DK.on).map(k => `<label class="check chip" style="cursor:pointer"><input type="checkbox" data-k="${k}" ${DK.on[k] ? 'checked' : ''}> ${DK_NAME[k]}</label>`).join('');
+  $$('#dockCtl input').forEach(i => i.onchange = () => { DK.on[i.dataset.k] = i.checked; });
+}
+function dkSend(from, to, val, kind = 'msg') { DK.parts.push({ from, to, p: 0, val, kind }); }
+function dkArrive(q) {
+  if (q.kind === 'fw') { const n = DK.nodes[q.to]; n.ver = DK.ota.ver; return; }
+  if (q.to === 'mosquitto') {
+    if (!DK.on.mosquitto) { DK.nodes[q.from].buf++; return; }
+    if (!DK.on.nodered) { DK.noSub++; if (q.val.n === 0) DK.serie.push(null); return; }
+    dkSend('mosquitto', 'nodered', q.val);
+  } else if (q.to === 'nodered') {
+    if (!DK.on.influxdb) { DK.nrErr++; if (q.val.n === 0) DK.serie.push(null); return; }
+    dkSend('nodered', 'influxdb', q.val);
+  } else if (q.to === 'influxdb') {
+    DK.stored++; if (q.val.n === 0) DK.serie.push(q.val.v);
+  }
+  if (DK.serie.length > 70) DK.serie.shift();
+}
+function dkStep(dt) {
+  DK.t += dt;
+  DK.nodes.forEach((n, i) => {
+    n.next -= dt;
+    if (n.next <= 0) {
+      n.next = 900 + Math.random() * 300;
+      const v = DK.tempBase + 4 * Math.sin(DK.t / 4000) + gauss() * .6;
+      DK.pub++;
+      if (!DK.on.mosquitto) { if (n.buf < 40) n.buf++; else { DK.lost++; if (i === 0) DK.serie.push(null); } }
+      else dkSend(i, 'mosquitto', { n: i, v });
+    }
+    if (DK.on.mosquitto && n.buf > 0 && Math.random() < .25) { n.buf--; dkSend(i, 'mosquitto', { n: i, v: DK.tempBase + gauss(), late: true }); }
+  });
+  DK.parts.forEach(q => q.p += dt / (q.kind === 'fw' ? 900 : 650));
+  DK.parts.filter(q => q.p >= 1).forEach(dkArrive);
+  DK.parts = DK.parts.filter(q => q.p < 1);
+  const o = DK.ota;
+  if (o) {
+    o.t += dt;
+    if (o.stage === 'build' && o.t > 2600) { o.stage = 'publish'; o.t = 0; }
+    else if (o.stage === 'publish' && o.t > 700) {
+      if (!DK.on.ota) { o.stage = 'fail'; o.t = 0; }
+      else { o.stage = 'deploy'; o.t = 0; o.i = 0; }
+    } else if (o.stage === 'deploy' && o.t > 700) {
+      o.t = 0;
+      if (!DK.on.ota) { o.stage = 'fail'; }
+      else if (o.i < DK.nodes.length) { dkSend('ota', o.i, null, 'fw'); o.i++; }
+      else if (o.t === 0 && !DK.parts.some(q => q.kind === 'fw')) { o.stage = 'done'; }
+    } else if ((o.stage === 'done' || o.stage === 'fail') && o.t > 4000) { DK.ota = null; $('#otaBtn').disabled = false; }
+  }
+}
+function dkBox(x, cx, cy, w, h, label, sub, on, col) {
+  x.fillStyle = on ? C.panel : C.soft; x.strokeStyle = on ? col : C.muted; x.lineWidth = 2; x.setLineDash(on ? [] : [4, 3]);
+  x.beginPath(); x.roundRect(cx - w / 2, cy - h / 2, w, h, 5); x.fill(); x.stroke(); x.setLineDash([]);
+  axisText(x, label, cx, cy - 1, 'center', on ? C.ink : C.muted, 11); axisText(x, sub, cx, cy + 13, 'center', on ? (col === C.bad ? C.bad : C.muted) : C.bad, 9);
+}
+function dkDraw() {
+  const { x, w, h } = fit($('#dockCv')); x.clearRect(0, 0, w, h);
+  x.fillStyle = rgba(C.info, .06); x.strokeStyle = rgba(C.info, .5); x.setLineDash([6, 4]); x.beginPath(); x.roundRect(w * .31, 10, w * .67, h - 20, 8); x.fill(); x.stroke(); x.setLineDash([]);
+  axisText(x, 'Pasarela de borde · Linux + Docker Engine', w * .31 + 10, 26, 'left', C.info, 11);
+  const lk = (a, b) => { const A = dkPos(a, w, h), B = dkPos(b, w, h); x.strokeStyle = C.line; x.lineWidth = 1.5; x.beginPath(); x.moveTo(A[0], A[1]); x.lineTo(B[0], B[1]); x.stroke(); };
+  [0, 1, 2, 3].forEach(i => lk(i, 'mosquitto')); lk('mosquitto', 'nodered'); lk('nodered', 'influxdb'); lk('influxdb', 'grafana'); lk('ota', 'mosquitto');
+  DK.parts.forEach(q => { const A = dkPos(q.from, w, h), B = dkPos(q.to, w, h); const px = A[0] + (B[0] - A[0]) * q.p, py = A[1] + (B[1] - A[1]) * q.p; x.fillStyle = q.kind === 'fw' ? C.vio : q.val && q.val.late ? C.warn : C.copper; x.beginPath(); x.arc(px, py, q.kind === 'fw' ? 6 : 4, 0, 7); x.fill(); });
+  DK.nodes.forEach((n, i) => { const [cx, cy] = dkPos(i, w, h); dkBox(x, cx, cy, Math.min(130, w * .19), 40, n.nm, `fw v${n.ver}` + (n.buf ? ` · buffer ${n.buf}` : ''), true, n.buf ? C.warn : C.pcb); });
+  const bw = Math.min(140, w * .17);
+  Object.keys(DK.on).forEach(k => { const [cx, cy] = dkPos(k, w, h); dkBox(x, cx, cy, bw, 40, DK_NAME[k], DK.on[k] ? 'running' : 'exited (0)', DK.on[k], C.pcb); });
+  const o = DK.ota;
+  if (o && (o.stage === 'build' || o.stage === 'publish')) { const [cx, cy] = dkPos('idf', w, h); dkBox(x, cx, cy, bw + 20, 40, 'espressif/idf:v5.3', o.stage === 'build' ? 'idf.py build ' + Math.min(100, Math.round(o.t / 26)) + ' %' : 'copiando .bin', true, C.vio); }
+  if (o && o.stage === 'fail') axisText(x, 'OTA fallida: el contenedor nginx no responde (HTTP 503)', w * .64, h - 18, 'center', C.bad, 11);
+  if (o && o.stage === 'done') axisText(x, 'OTA completada: los 4 nodos verificaron la firma y reiniciaron', w * .64, h - 18, 'center', C.ok, 11);
+}
+function dkGraf() {
+  const { x, w, h } = fit($('#grafCv')); x.clearRect(0, 0, w, h);
+  if (!DK.on.grafana) { axisText(x, 'Grafana detenido: los datos siguen guardándose en InfluxDB', w / 2, h / 2, 'center', C.muted, 11); return; }
+  const L = 34, R = 8, T = 10, B = 16, lo = 172, hi = 192, Y = v => T + (h - T - B) * (1 - (v - lo) / (hi - lo));
+  x.strokeStyle = C.line; [175, 182, 189].forEach(v => { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(w - R, Y(v)); x.stroke(); axisText(x, v, L - 4, Y(v) + 3, 'right'); });
+  const n = 70, X = i => L + i / (n - 1) * (w - L - R), s = DK.serie, off = n - s.length;
+  x.fillStyle = rgba(C.pcb, .15); x.strokeStyle = C.pcb; x.lineWidth = 2;
+  let seg = [];
+  const flush = () => { if (seg.length > 1) { x.beginPath(); seg.forEach((p, j) => j ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.stroke(); x.lineTo(seg[seg.length - 1][0], h - B); x.lineTo(seg[0][0], h - B); x.fill(); } seg = []; };
+  s.forEach((v, i) => { if (v == null) { flush(); x.fillStyle = rgba(C.bad, .18); x.fillRect(X(i + off) - 2, T, 4, h - T - B); x.fillStyle = rgba(C.pcb, .15); } else seg.push([X(i + off), Y(v)]); });
+  flush();
+  if (s.length && s[s.length - 1] != null) { const p = [X(n - 1), Y(s[s.length - 1])]; x.fillStyle = C.pcb; x.beginPath(); x.arc(p[0], p[1], 3.5, 0, 7); x.fill(); axisText(x, s[s.length - 1].toFixed(1) + ' °C', p[0] - 6, p[1] - 8, 'right', C.ink, 10); }
+}
+function dkStats() {
+  const buf = DK.nodes.reduce((a, n) => a + n.buf, 0);
+  $('#dockStats').innerHTML = `<div class="kv"><span>Publicados por los ESP32</span><span><b>${DK.pub}</b></span>
+  <span>Guardados en InfluxDB</span><span>${DK.stored}</span>
+  <span>En buffer local (sin broker)</span><span>${buf ? `<span class="pill warn">${buf}</span>` : 0}</span>
+  <span>Perdidos (buffer lleno)</span><span>${DK.lost ? `<span class="pill bad">${DK.lost}</span>` : 0}</span>
+  <span>Sin suscriptor (Node-RED caído)</span><span>${DK.noSub}</span>
+  <span>Errores de escritura en Influx</span><span>${DK.nrErr}</span>
+  <span>Versión de firmware</span><span>${[...new Set(DK.nodes.map(n => 'v' + n.ver))].join(', ')}</span></div>`;
+}
+$('#otaBtn').onclick = () => { if (DK.ota) return; const v = (parseFloat(DK.nodes[0].ver) + .1).toFixed(1); DK.ota = { stage: 'build', t: 0, ver: v, i: 0 }; $('#otaBtn').disabled = true; };
+let dkStatT = 0;
+anim.docker = dt => { dkStep(dt); dkDraw(); dkStatT += dt; if (dkStatT > 250) { dkStatT = 0; dkGraf(); dkStats(); } };
+onShow.docker = () => { dkBuildCtl(); dkDraw(); dkGraf(); dkStats(); };
+
+/* ============ 07 CRIPTOGRAFÍA ============ */
+const SHA_K = new Uint32Array([0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+const W = new Uint32Array(64);
+function sha256(msg) {
+  const ml = msg.length, nb = ((ml + 9 + 63) >> 6) << 6, b = new Uint8Array(nb);
+  b.set(msg); b[ml] = 0x80; const bits = ml * 8;
+  b[nb - 4] = bits >>> 24; b[nb - 3] = bits >>> 16 & 255; b[nb - 2] = bits >>> 8 & 255; b[nb - 1] = bits & 255; b[nb - 5] = Math.floor(bits / 2 ** 32) & 255;
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a, h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+  for (let o = 0; o < nb; o += 64) {
+    for (let i = 0; i < 16; i++) W[i] = b[o + 4 * i] << 24 | b[o + 4 * i + 1] << 16 | b[o + 4 * i + 2] << 8 | b[o + 4 * i + 3];
+    for (let i = 16; i < 64; i++) {
+      const a = W[i - 15], c = W[i - 2];
+      const s0 = (a >>> 7 | a << 25) ^ (a >>> 18 | a << 14) ^ (a >>> 3);
+      const s1 = (c >>> 17 | c << 15) ^ (c >>> 19 | c << 13) ^ (c >>> 10);
+      W[i] = W[i - 16] + s0 + W[i - 7] + s1;
+    }
+    let a = h0, bb = h1, c = h2, d = h3, e = h4, f = h5, g = h6, hh = h7;
+    for (let i = 0; i < 64; i++) {
+      const S1 = (e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7);
+      const t1 = (hh + S1 + ((e & f) ^ (~e & g)) + SHA_K[i] + W[i]) | 0;
+      const S0 = (a >>> 2 | a << 30) ^ (a >>> 13 | a << 19) ^ (a >>> 22 | a << 10);
+      const t2 = (S0 + ((a & bb) ^ (a & c) ^ (bb & c))) | 0;
+      hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+    }
+    h0 = (h0 + a) | 0; h1 = (h1 + bb) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0; h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + hh) | 0;
+  }
+  const out = new Uint8Array(32);
+  [h0, h1, h2, h3, h4, h5, h6, h7].forEach((v, i) => { out[4 * i] = v >>> 24; out[4 * i + 1] = v >>> 16 & 255; out[4 * i + 2] = v >>> 8 & 255; out[4 * i + 3] = v & 255; });
+  return out;
+}
+const enc = new TextEncoder();
+const hex = u => [...u].map(v => v.toString(16).padStart(2, '0')).join('');
+const sha256hex = s => hex(sha256(enc.encode(s)));
+
+/* --- AES-GCM --- */
+const AES = { key: null, raw: null, iv: null, ct: null, tampered: false };
+async function aesNewKey() {
+  if (!(window.crypto && crypto.subtle)) { $('#aesOut').innerHTML = '<span class="pill bad">Web Crypto no disponible en este navegador</span>'; return; }
+  AES.key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  AES.raw = new Uint8Array(await crypto.subtle.exportKey('raw', AES.key)); AES.ct = null; AES.tampered = false; aesShow('Clave nueva de 256 bits generada con el TRNG del navegador (en el ESP32: esp_fill_random).');
+}
+function aesShow(msg, extra = '') {
+  const ct = AES.ct; let ctHex = '';
+  if (ct) { const body = ct.slice(0, ct.length - 16), tag = ct.slice(ct.length - 16); ctHex = `<span>Texto cifrado</span><span class="hex">${hex(body).replace(/^(..)/, AES.tampered ? `<b style="color:${C.bad}">$1</b>` : '$1')}</span><span>Etiqueta GCM</span><span class="hex">${hex(tag)}</span>`; }
+  $('#aesOut').innerHTML = `<div class="kv"><span>Clave</span><span class="hex">${AES.raw ? hex(AES.raw) : '—'}</span><span>IV (96 bits)</span><span class="hex">${AES.iv ? hex(AES.iv) : '—'}</span>${ctHex}<span>Estado</span><span>${msg}</span>${extra}</div>`;
+}
+$('#aesKey').onclick = aesNewKey;
+$('#aesEnc').onclick = async () => {
+  if (!AES.key) await aesNewKey(); if (!AES.key) return;
+  AES.iv = crypto.getRandomValues(new Uint8Array(12));
+  AES.ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: AES.iv }, AES.key, enc.encode($('#aesPlain').value)));
+  AES.tampered = false; aesShow(`<span class="pill ok">cifrado</span> ${AES.ct.length - 16} B de datos + 16 B de etiqueta. Cambiar un solo bit invalida la etiqueta.`);
+};
+$('#aesTamper').onclick = () => { if (!AES.ct) return aesShow('Primero cifra un mensaje.'); AES.ct[0] ^= 0x01; AES.tampered = !AES.tampered; aesShow(AES.tampered ? '<span class="pill warn">byte 0 alterado</span> Simula un atacante que modifica la trama en el aire.' : 'Byte restaurado.'); };
+$('#aesDec').onclick = async () => {
+  if (!AES.ct) return aesShow('Primero cifra un mensaje.');
+  try { const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: AES.iv }, AES.key, AES.ct); aesShow('<span class="pill ok">etiqueta válida</span> Mensaje auténtico e íntegro.', `<span>Descifrado</span><span class="hex">${esc(new TextDecoder().decode(pt))}</span>`); }
+  catch (e) { aesShow('<span class="pill bad">OperationError</span> La etiqueta no coincide: la pasarela descarta la trama sin revelar ningún dato.'); }
+};
+
+/* --- SHA avalancha --- */
+let shaPrev = null;
+function shaUpdate() {
+  const h = sha256(enc.encode($('#shaIn').value)); const prev = shaPrev || h; let diff = 0;
+  const { x, w, h: hh } = fit($('#shaCv')); x.clearRect(0, 0, w, hh);
+  const cw = w / 64, ch = hh / 4;
+  for (let i = 0; i < 256; i++) {
+    const bit = h[i >> 3] >> (7 - (i & 7)) & 1, pb = prev[i >> 3] >> (7 - (i & 7)) & 1, d = bit !== pb; if (d) diff++;
+    x.fillStyle = d ? C.copper : bit ? rgba(C.ink, .55) : rgba(C.ink, .1);
+    x.fillRect((i % 64) * cw + .5, Math.floor(i / 64) * ch + .5, cw - 1, ch - 1);
+  }
+  $('#shaOut').innerHTML = `<div class="kv"><span>SHA-256</span><span class="hex">${hex(h)}</span><span>Bits que cambiaron</span><span><b>${shaPrev ? diff : '—'}</b> de 256 ${shaPrev ? `(${(diff / 2.56).toFixed(0)} %)` : '· escribe para comparar'}</span></div>`;
+  shaPrev = h;
+}
+$('#shaIn').addEventListener('input', shaUpdate);
+
+/* --- Blockchain --- */
+const BC = { chain: [], pending: [], miner: null };
+function bcHash(b) { return sha256hex(`${b.i}|${b.ts}|${b.data}|${b.prev}|${b.nonce}`); }
+const bcOk = b => b.hash.startsWith('0'.repeat(b.dif));
+function bcRelink(from) { for (let i = Math.max(1, from); i < BC.chain.length; i++) { BC.chain[i].prev = BC.chain[i - 1].hash; BC.chain[i].hash = bcHash(BC.chain[i]); } }
+function bcReading() { const k = $('#bcNode').selectedIndex; return ['temp=' + (180 + Math.random() * 8).toFixed(1) + '°C', 'presion=' + (7 + Math.random()).toFixed(2) + 'bar', 'caudal=' + (40 + Math.random() * 6).toFixed(1) + 'L/min'][k]; }
+function bcStartMine(blk, onDone) {
+  BC.miner = { b: blk, n: 0, t0: performance.now(), onDone }; blk.nonce = 0; $('#bcMine').disabled = true;
+}
+function bcMineStep() {
+  const m = BC.miner; if (!m) return;
+  const z = '0'.repeat(m.b.dif);
+  for (let k = 0; k < 2500; k++) { m.b.hash = bcHash(m.b); if (m.b.hash.startsWith(z)) { const ms = performance.now() - m.t0; BC.miner = null; $('#bcMine').disabled = false; m.onDone(m.b, ms, m.n + 1); return; } m.b.nonce++; m.n++; }
+  $('#bcStatus').innerHTML = `Minando bloque #${m.b.i} · nonce ${m.b.nonce} · ${m.n.toLocaleString('es')} hashes · último <span class="mono">${m.b.hash.slice(0, 16)}…</span>`;
+}
+function bcRender() {
+  $('#bcChain').innerHTML = BC.chain.map((b, i) => `<div class="block" data-i="${i}">
+    <div class="row" style="justify-content:space-between"><b>Bloque #${b.i}</b><span class="pill st"></span></div>
+    <div class="h">ts ${new Date(b.ts).toLocaleTimeString('es-CO')} · dificultad ${b.dif}</div>
+    <textarea aria-label="Datos del bloque ${b.i}">${esc(b.data)}</textarea>
+    <div class="h">prev <b class="pv"></b></div><div class="h">nonce <b class="nc"></b></div><div class="h">hash <b class="hs"></b></div>
+    <button class="btn sm ghost rm">Re-minar este bloque</button></div>`).join('');
+  $$('#bcChain .block').forEach(el => {
+    const i = +el.dataset.i;
+    el.querySelector('textarea').addEventListener('input', e => { BC.chain[i].data = e.target.value; BC.chain[i].hash = bcHash(BC.chain[i]); bcRelink(i + 1); bcUpdate(); });
+    el.querySelector('.rm').onclick = () => { if (BC.miner) return; bcStartMine(BC.chain[i], (b, ms, n) => { bcRelink(i + 1); bcUpdate(); $('#bcStatus').innerHTML = `Bloque #${b.i} re-minado en ${n.toLocaleString('es')} hashes (${ms.toFixed(0)} ms). Los bloques siguientes siguen inválidos hasta re-minarlos.`; }); };
+  });
+  bcUpdate(); const chEl = $('#bcChain'); chEl.scrollLeft = chEl.scrollWidth;
+}
+function bcUpdate() {
+  $$('#bcChain .block').forEach(elB => {
+    const b = BC.chain[+elB.dataset.i], ok = bcOk(b);
+    elB.classList.toggle('bad', !ok);
+    const st = elB.querySelector('.st'); st.className = 'pill st ' + (ok ? 'ok' : 'bad'); st.textContent = ok ? 'válido' : 'inválido';
+    elB.querySelector('.pv').textContent = b.prev.slice(0, 24) + '…'; elB.querySelector('.nc').textContent = b.nonce; elB.querySelector('.hs').textContent = b.hash;
+  });
+}
+function bcInit() {
+  const g = { i: 0, ts: Date.now(), data: 'Génesis · planta Bogotá · 3 nodos ESP32', prev: '0'.repeat(64), nonce: 0, dif: 2, hash: '' };
+  BC.chain = [g]; bcStartMine(g, () => { bcRender(); $('#bcStatus').textContent = 'Bloque génesis minado. Agrega transacciones y mina el siguiente bloque.'; });
+}
+$('#bcAdd').onclick = () => { const v = $('#bcData').value.trim() || bcReading(); BC.pending.push(`${$('#bcNode').value.split(' ')[0]} → ${v}`); $('#bcData').value = bcReading(); $('#bcStatus').innerHTML = `Pendientes (${BC.pending.length}): ${BC.pending.map(esc).join(' · ')}`; };
+$('#bcMine').onclick = () => {
+  if (BC.miner) return;
+  if (!BC.pending.length) BC.pending.push(`${$('#bcNode').value.split(' ')[0]} → ${$('#bcData').value || bcReading()}`);
+  const last = BC.chain[BC.chain.length - 1];
+  const b = { i: BC.chain.length, ts: Date.now(), data: BC.pending.join('\n'), prev: last.hash, nonce: 0, dif: +$('#bcDiff').value, hash: '' };
+  BC.pending = [];
+  bcStartMine(b, (blk, ms, n) => { BC.chain.push(blk); bcRender(); $('#bcStatus').innerHTML = `Bloque #${blk.i} minado: ${n.toLocaleString('es')} hashes en ${(ms / 1000).toFixed(2)} s ≈ ${Math.round(n / (ms / 1000)).toLocaleString('es')} H/s en este navegador. Un ESP32 con el acelerador SHA hace del orden de decenas de miles de H/s: por eso no se usa como minero.`; });
+};
+$('#bcDiff').oninput = () => $('#bcDiffo').textContent = $('#bcDiff').value;
+anim.cripto = () => bcMineStep();
+onShow.cripto = () => {
+  $('#bcDiffo').textContent = $('#bcDiff').value; if (!$('#bcData').value) $('#bcData').value = bcReading();
+  if (!BC.chain.length) bcInit(); shaUpdate(); if (!AES.raw) aesNewKey(); else aesShow('Listo.');
+};
+/* ============ 08 ASYNCIO ============ */
+const AIO = { t: 0, tasks: [], ready: [], holder: null, wait: [], next: 1, blockReq: false, blockUntil: 0, blocker: null, loopHist: [], lines: [], cur: '', dirty: true };
+const AIO_COL = ['pcb', 'info', 'vio', 'copper', 'gold', 'ok'];
+const AIO_DEF = {
+  sensor: { fn: 'leer_sensor', make: T => gSensor(T) },
+  blink: { fn: 'parpadear_led', make: T => gBlink(T) },
+  uartA: { fn: 'publicar_mqtt', make: T => gUart(T, 'MQTT planta/temp=24.5') },
+  uartB: { fn: 'registrar_log', make: T => gUart(T, 'LOG nivel=INFO ok') },
+  watch: { fn: 'vigilar_bateria', make: T => gWatch(T) }
+};
+function* pausePoint(T) { while (T.paused) yield { pause: true }; }
+function* gSensor(T) { while (true) { yield* pausePoint(T); T.print(`[${T.name}] ADC34 = ${Math.round(1480 + Math.random() * 320)} mV`); yield { sleep: 700 }; } }
+function* gBlink(T) { while (true) { yield* pausePoint(T); T.led = !T.led; yield { sleep: 300 }; } }
+function* gWatch(T) { while (true) { yield* pausePoint(T); T.print(`[${T.name}] batería ${(3.7 + Math.random() * .3).toFixed(2)} V`); yield { sleep: 1500 }; } }
+function* gUart(T, msg) {
+  try {
+    while (true) {
+      yield* pausePoint(T);
+      const useLock = $('#aioLock').checked;
+      if (useLock) yield { acquire: true };
+      for (let i = 0; i < msg.length; i += 4) { aioWrite(msg.slice(i, i + 4)); yield { sleep: 15 }; }
+      aioWrite('\n');
+      if (AIO.holder === T) yield { release: true };
+      yield { sleep: 350 + Math.random() * 200 };
+    }
+  } finally {
+    if (AIO.holder === T) aioRelease(T);
+    AIO.lines.push(['sy', `[${T.name}] CancelledError capturado → limpieza; el Lock queda libre`]);
+  }
+}
+function aioWrite(s) {
+  for (const ch of s) { if (ch === '\n') { AIO.lines.push(['', 'UART> ' + AIO.cur]); AIO.cur = ''; } else AIO.cur += ch; }
+  if (AIO.cur.length > 70) { AIO.lines.push(['', 'UART> ' + AIO.cur]); AIO.cur = ''; }
+}
+function aioState(T, s) { if (T.state === s) return; T.hist.push([T.segT, AIO.t, T.state]); if (T.hist.length > 400) T.hist.shift(); T.state = s; T.segT = AIO.t; AIO.dirty = true; }
+function aioRelease(T) {
+  if (AIO.holder !== T) return;
+  AIO.holder = AIO.wait.shift() || null;
+  if (AIO.holder) { aioState(AIO.holder, 'ready'); AIO.ready.push(AIO.holder); }
+}
+function aioCreate(type) {
+  const d = AIO_DEF[type], id = AIO.next++;
+  const T = { id, type, name: d.fn, var: 't' + id, col: AIO_COL[(id - 1) % AIO_COL.length], state: 'ready', segT: AIO.t, hist: [], paused: false, led: false, wake: 0 };
+  T.print = s => AIO.lines.push(['', s]);
+  T.gen = d.make(T);
+  AIO.tasks.push(T); AIO.ready.push(T);
+  AIO.lines.push(['sy', `>>> ${T.var} = asyncio.create_task(${d.fn}())`]);
+  aioBuildList();
+}
+function aioCancel(T) {
+  if (T.state === 'done' || T.state === 'cancel') return;
+  AIO.lines.push(['sy', `>>> ${T.var}.cancel()`]);
+  AIO.ready = AIO.ready.filter(k => k !== T); AIO.wait = AIO.wait.filter(k => k !== T);
+  try { T.gen.return(); } catch (e) {}
+  aioState(T, 'cancel');
+}
+function aioRun(dt) {
+  const end = AIO.t + dt * +$('#aioSpeed').value; let guard = 0;
+  while (AIO.t < end && guard++ < 400) {
+    if (AIO.blocker) {
+      AIO.t = Math.min(end, AIO.blockUntil);
+      if (AIO.t >= AIO.blockUntil) { AIO.loopHist.push([AIO.blockUntil - 1000, AIO.blockUntil]); const B = AIO.blocker; AIO.blocker = null; aioState(B, 'ready'); AIO.ready.push(B); }
+      continue;
+    }
+    AIO.tasks.forEach(T => { if (T.state === 'sleep' && T.wake <= AIO.t) { const late = AIO.t - T.wake; if (late > 60) AIO.lines.push(['er', `[loop] ${T.name}() despertó con ${late.toFixed(0)} ms de retraso`]); aioState(T, 'ready'); AIO.ready.push(T); } });
+    if (!AIO.ready.length) {
+      const nw = Math.min(...AIO.tasks.filter(T => T.state === 'sleep').map(T => T.wake));
+      AIO.t = isFinite(nw) ? Math.min(end, Math.max(AIO.t, nw)) : end; continue;
+    }
+    const T = AIO.ready.shift();
+    if (T.state === 'cancel' || T.state === 'done') continue;
+    aioState(T, 'run');
+    if (AIO.blockReq) {
+      AIO.blockReq = false; AIO.blocker = T; AIO.blockUntil = AIO.t + 1000; aioState(T, 'block');
+      AIO.lines.push(['er', `[${T.name}] time.sleep(1) → el ciclo de eventos queda congelado 1000 ms`]); continue;
+    }
+    let r; try { r = T.gen.next(); } catch (e) { aioState(T, 'done'); continue; }
+    AIO.t += 1.2;
+    if (r.done) { aioState(T, 'done'); continue; }
+    const y = r.value;
+    if (y.sleep !== undefined) { if (y.sleep === 0) { aioState(T, 'ready'); AIO.ready.push(T); } else { T.wake = AIO.t + y.sleep; aioState(T, 'sleep'); } }
+    else if (y.acquire) { if (!AIO.holder) { AIO.holder = T; aioState(T, 'ready'); AIO.ready.push(T); } else { aioState(T, 'lock'); AIO.wait.push(T); } }
+    else if (y.release) { aioRelease(T); aioState(T, 'ready'); AIO.ready.push(T); }
+    else if (y.pause) aioState(T, 'pause');
+  }
+  if (AIO.lines.length > 200) AIO.lines.splice(0, AIO.lines.length - 200);
+}
+const AIO_ST = { run: ['copper', 'ejecutando'], ready: ['info', 'lista'], sleep: ['line', 'await sleep'], lock: ['warn', 'await lock'], pause: ['muted', 'await event'], block: ['bad', 'bloqueando'], done: ['muted', 'terminada'], cancel: ['bad', 'cancelada'] };
+function aioDraw() {
+  const { x, w, h } = fit($('#aioCv')); x.clearRect(0, 0, w, h);
+  const vis = AIO.tasks.filter(T => T.state !== 'cancel' && T.state !== 'done' || AIO.t - T.segT < 4000);
+  const L = 150, R = 10, rows = vis.length + 1, rh = Math.min(30, (h - 26) / Math.max(1, rows)), WIN = 4000, t0 = AIO.t - WIN;
+  const X = t => L + (t - t0) / WIN * (w - L - R);
+  for (let s = Math.ceil(t0 / 1000) * 1000; s <= AIO.t; s += 1000) { x.strokeStyle = C.line; x.beginPath(); x.moveTo(X(s), 4); x.lineTo(X(s), h - 18); x.stroke(); axisText(x, (s / 1000).toFixed(0) + ' s', X(s), h - 5, 'center'); }
+  axisText(x, 'ciclo de eventos', 8, 4 + rh / 2 + 4, 'left', C.ink, 11);
+  x.fillStyle = rgba(C.ok, .25); x.fillRect(L, 4 + rh * .3, w - L - R, rh * .4);
+  const blocks = AIO.loopHist.slice(); if (AIO.blocker) blocks.push([AIO.blockUntil - 1000, AIO.t]);
+  blocks.forEach(([a, b]) => { if (b < t0) return; x.fillStyle = C.bad; x.fillRect(Math.max(L, X(a)), 4 + rh * .2, X(b) - Math.max(L, X(a)), rh * .6); });
+  vis.forEach((T, i) => {
+    const y = 4 + (i + 1) * rh;
+    x.fillStyle = C[T.col]; x.fillRect(8, y + rh / 2 - 5, 10, 10);
+    axisText(x, `${T.var} ${T.name}`, 24, y + rh / 2 + 4, 'left', C.ink, 10.5);
+    const segs = T.hist.concat([[T.segT, AIO.t, T.state]]);
+    segs.forEach(([a, b, s]) => {
+      if (b < t0 || s === 'done' || s === 'cancel') return;
+      const xa = Math.max(L, X(a)), xb = X(b); const c = AIO_ST[s][0];
+      if (s === 'run') { x.fillStyle = C.copper; x.fillRect(xa, y + 3, Math.max(2, xb - xa), rh - 6); }
+      else if (s === 'sleep') { x.fillStyle = rgba(C[T.col], .18); x.fillRect(xa, y + rh * .35, xb - xa, rh * .3); }
+      else { x.fillStyle = s === 'ready' ? rgba(C.info, .45) : rgba(C[c], s === 'pause' ? .45 : .8); x.fillRect(xa, y + rh * .25, Math.max(1, xb - xa), rh * .5); }
+    });
+    if (T.type === 'blink' && T.state !== 'cancel') { x.fillStyle = T.led ? C.gold : C.line; x.beginPath(); x.arc(L - 10, y + rh / 2, 5, 0, 7); x.fill(); }
+  });
+}
+function aioBuildList() {
+  $('#aioTasks').innerHTML = AIO.tasks.map(T => `<div class="trow" data-id="${T.id}"><span class="sw" style="background:${C[T.col]}"></span>
+    <span class="nm">${T.var} = create_task(${T.name}()) <span class="pill st"></span></span>
+    <span class="row" style="flex-wrap:nowrap"><button class="btn sm ghost pz">Pausar</button><button class="btn sm warn cx">Cancelar</button></span></div>`).join('');
+  $$('#aioTasks .trow').forEach(r => {
+    const T = AIO.tasks.find(k => k.id === +r.dataset.id);
+    r.querySelector('.pz').onclick = () => {
+      if (T.state === 'cancel' || T.state === 'done') return;
+      T.paused = !T.paused;
+      AIO.lines.push(['sy', T.paused ? `>>> continuar["${T.var}"].clear()   # pausa en el próximo punto de control` : `>>> continuar["${T.var}"].set()     # reanudar`]);
+      if (!T.paused && T.state === 'pause') { aioState(T, 'ready'); AIO.ready.push(T); }
+      AIO.dirty = true;
+    };
+    r.querySelector('.cx').onclick = () => aioCancel(T);
+  });
+  AIO.dirty = true;
+}
+function aioUi() {
+  $$('#aioTasks .trow').forEach(r => {
+    const T = AIO.tasks.find(k => k.id === +r.dataset.id); const st = AIO_ST[T.state];
+    const p = r.querySelector('.st'); p.textContent = T.paused && T.state !== 'pause' && T.state !== 'cancel' ? 'pausa pendiente' : st[1];
+    p.className = 'pill st ' + ({ run: 'warn', ready: 'info', lock: 'warn', block: 'bad', cancel: 'bad', pause: '' }[T.state] || '');
+    const pz = r.querySelector('.pz'); pz.textContent = T.paused ? 'Reanudar' : 'Pausar';
+    const dead = T.state === 'cancel' || T.state === 'done'; pz.disabled = dead; r.querySelector('.cx').disabled = dead;
+  });
+  const names = a => a.length ? a.map(T => T.var).join(', ') : '—';
+  const sl = AIO.tasks.filter(T => T.state === 'sleep').sort((a, b) => a.wake - b.wake);
+  $('#aioQueues').innerHTML = `<div class="kv"><span>Reloj del ciclo</span><span>${(AIO.t / 1000).toFixed(2)} s</span>
+    <span>Cola de listas</span><span>${names(AIO.ready)}</span>
+    <span>Dormidas</span><span>${sl.length ? sl.map(T => `${T.var} (+${Math.max(0, T.wake - AIO.t).toFixed(0)} ms)`).join(', ') : '—'}</span>
+    <span>Lock de la UART</span><span>${$('#aioLock').checked ? (AIO.holder ? 'en poder de ' + AIO.holder.var : 'libre') + (AIO.wait.length ? ' · esperan ' + names(AIO.wait) : '') : '<span class="pill bad">sin protección</span>'}</span>
+    <span>Pausadas</span><span>${names(AIO.tasks.filter(T => T.state === 'pause'))}</span></div>`;
+  const ser = $('#aioSerial'); const atBottom = ser.scrollHeight - ser.scrollTop - ser.clientHeight < 30;
+  ser.innerHTML = AIO.lines.slice(-80).map(([c, s]) => `<div class="${c}">${esc(s)}</div>`).join('') + (AIO.cur ? `<div>UART> ${esc(AIO.cur)}▌</div>` : '');
+  if (atBottom) ser.scrollTop = ser.scrollHeight;
+}
+$('#aioAdd').onclick = () => aioCreate($('#aioType').value);
+$('#aioBlock').onclick = () => { AIO.blockReq = true; };
+$('#aioSpeed').oninput = () => $('#aioSpeedo').textContent = (+$('#aioSpeed').value).toFixed(1) + '×';
+let aioUiT = 0;
+anim.asyncio = dt => { aioRun(dt); aioDraw(); aioUiT += dt; if (aioUiT > 180) { aioUiT = 0; aioUi(); } };
+onShow.asyncio = () => { if (!AIO.tasks.length) ['sensor', 'blink', 'uartA', 'uartB'].forEach(aioCreate); $('#aioSpeedo').textContent = (+$('#aioSpeed').value).toFixed(1) + '×'; aioDraw(); aioUi(); };
+/* ============ 09 VISIÓN ============ */
+const FEED_BG = '#18201d', FEED_LINE = '#e9f0ec', FEED_DOT = '#ff5a4a', FEED_TXT = '#c9d6cf';
+const GEST = [
+  ['palma', 'Palma abierta', [0, 0, 0, 0, 0]], ['puno', 'Puño', [1, 1, 1, 1, 1]], ['indice', 'Índice', [1, 0, 1, 1, 1]],
+  ['v', 'Victoria (V)', [1, 0, 0, 1, 1]], ['tres', 'Tres dedos', [1, 0, 0, 0, 1]], ['pulgar', 'Pulgar arriba', [0, 1, 1, 1, 1]], ['pinza', 'Pinza proporcional', null]
+];
+const HAND = { g: 'palma', auto: true, autoT: 0, curl: [0, 0, 0, 0, 0], t: 0, esp: { led: false, servo: 90, rgb: null, pwm: 0 }, last: '' };
+function handBuild() {
+  $('#handGest').innerHTML = GEST.map(g => `<button class="chip" data-g="${g[0]}" aria-pressed="${!HAND.auto && HAND.g === g[0]}">${g[1]}</button>`).join('') + `<button class="chip" data-g="auto" aria-pressed="${HAND.auto}">Demostración automática</button>`;
+  $$('#handGest .chip').forEach(b => b.onclick = () => { if (b.dataset.g === 'auto') HAND.auto = !HAND.auto; else { HAND.auto = false; HAND.g = b.dataset.g; } handBuild(); });
+}
+function handTarget() {
+  if (HAND.g === 'pinza') { const s = (Math.sin(HAND.t / 700) + 1) / 2; return [.08 * s, .05 + .27 * s, 1, 1, 1]; }
+  return GEST.find(g => g[0] === HAND.g)[2];
+}
+function handLandmarks(cx, cy, s) {
+  const P = []; const rad = d => d * Math.PI / 180; const wob = Math.sin(HAND.t / 900) * 2;
+  const wrist = [cx + wob * s, cy + 110 * s]; P[0] = wrist;
+  const thumbBase = [wrist[0] - 30 * s, wrist[1] - 22 * s]; P[1] = thumbBase;
+  let a = -140, p = thumbBase; const tl = [32, 28, 24], tc = HAND.curl[0];
+  [40, 70, 70].forEach((d, k) => { a += tc * d; p = [p[0] + Math.cos(rad(a)) * tl[k] * s, p[1] + Math.sin(rad(a)) * tl[k] * s]; P[2 + k] = p; });
+  const F = [[[-30, -95], -100, [40, 25, 22]], [[-6, -102], -90, [44, 28, 24]], [[17, -96], -81, [40, 26, 22]], [[37, -82], -70, [32, 20, 18]]];
+  F.forEach(([b, dir, ls], f) => {
+    const c = HAND.curl[f + 1]; let q = [wrist[0] + b[0] * s, wrist[1] + b[1] * s]; const idx = 5 + f * 4; P[idx] = q;
+    const th = [75, 165, 235].map(v => rad(v * c)); const dx = Math.cos(rad(dir)), dy = Math.sin(rad(dir));
+    ls.forEach((l, k) => { const pr = Math.cos(th[k]) * l * s; q = [q[0] + dx * pr + Math.sin(th[k]) * l * s * .12 * (f - 1.5), q[1] + dy * pr]; P[idx + 1 + k] = q; });
+  });
+  return P;
+}
+const HCON = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]];
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function handClassify(P) {
+  const ext = [dist(P[4], P[9]) > dist(P[2], P[9]) * 1.02];
+  [[8, 6], [12, 10], [16, 14], [20, 18]].forEach(([t, p]) => ext.push(dist(P[t], P[0]) > dist(P[p], P[0]) * 1.12));
+  const n = ext.filter(Boolean).length, palm = dist(P[0], P[9]);
+  const key = ext.map(e => e ? 1 : 0).join('');
+  let g = 'desconocido';
+  if (!ext[2] && !ext[3] && !ext[4] && ext[0] && ext[1]) g = 'pinza';
+  else if (key === '11111') g = 'palma'; else if (key === '00000') g = 'puno'; else if (key === '01000') g = 'indice';
+  else if (key === '01100') g = 'v'; else if (key === '01110') g = 'tres'; else if (key === '10000') g = 'pulgar';
+  return { ext, n, g, pinch: clamp((dist(P[4], P[8]) / palm - .75) / .45, 0, 1) };
+}
+function handStep(dt) {
+  HAND.t += dt;
+  if (HAND.auto) { HAND.autoT += dt; if (HAND.autoT > 2600) { HAND.autoT = 0; const i = GEST.findIndex(g => g[0] === HAND.g); HAND.g = GEST[(i + 1) % GEST.length][0]; } }
+  const tg = handTarget(); HAND.curl = HAND.curl.map((c, i) => c + (tg[i] - c) * Math.min(1, dt / 160));
+  const { x, w, h } = fit($('#handCv'));
+  const gr = x.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#22302b'); gr.addColorStop(1, FEED_BG); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+  const s = Math.min(w, h) / 245, P = handLandmarks(w / 2, h / 2 - 12 * s, s);
+  const xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+  x.strokeStyle = 'rgba(120,220,170,.6)'; x.setLineDash([5, 4]); x.strokeRect(Math.min(...xs) - 14, Math.min(...ys) - 14, Math.max(...xs) - Math.min(...xs) + 28, Math.max(...ys) - Math.min(...ys) + 28); x.setLineDash([]);
+  x.strokeStyle = FEED_LINE; x.lineWidth = 2.5; HCON.forEach(([a, b]) => { x.beginPath(); x.moveTo(P[a][0], P[a][1]); x.lineTo(P[b][0], P[b][1]); x.stroke(); });
+  P.forEach((p, i) => { x.fillStyle = FEED_DOT; x.beginPath(); x.arc(p[0], p[1], [4, 8, 12, 16, 20].includes(i) ? 5 : 3.6, 0, 7); x.fill(); });
+  const r = handClassify(P);
+  if (r.g === 'pinza') { x.strokeStyle = '#ffd166'; x.lineWidth = 2; x.beginPath(); x.moveTo(P[4][0], P[4][1]); x.lineTo(P[8][0], P[8][1]); x.stroke(); }
+  axisText(x, 'cv2.VideoCapture(0) · 640×480 · 30 FPS', 10, 16, 'left', FEED_TXT, 10);
+  axisText(x, 'Right · score 0.97', 10, 30, 'left', FEED_TXT, 10);
+  axisText(x, 'gesto: ' + (GEST.find(g => g[0] === r.g) || ['', r.g])[1], w - 10, h - 12, 'right', '#ffd166', 12);
+  const E = HAND.esp; let cmd = null;
+  if (r.g === 'palma') { E.led = true; cmd = { cmd: 'led', v: 1 }; }
+  else if (r.g === 'puno') { E.led = false; cmd = { cmd: 'led', v: 0 }; }
+  else if (r.g === 'indice') { E.servo = 0; cmd = { cmd: 'servo', ang: 0 }; }
+  else if (r.g === 'v') { E.servo = 180; E.rgb = '#d24bd6'; cmd = { cmd: 'servo', ang: 180 }; }
+  else if (r.g === 'tres') { E.servo = 90; E.rgb = '#3d7bff'; cmd = { cmd: 'rgb', c: 'azul' }; }
+  else if (r.g === 'pulgar') { E.rgb = '#2fbf71'; cmd = { cmd: 'armar', v: true }; }
+  else if (r.g === 'pinza') { E.pwm = r.pinch; cmd = { cmd: 'pwm', duty: +r.pinch.toFixed(2) }; }
+  $('#hLed').style.background = E.led ? C.gold : C.soft; $('#hLed').style.boxShadow = E.led ? `0 0 14px ${rgba(C.gold, .8)}` : 'none';
+  const rad = (180 - E.servo) * Math.PI / 180; $('#hNeedle').setAttribute('x2', 35 + 28 * Math.cos(rad)); $('#hNeedle').setAttribute('y2', 40 - 28 * Math.sin(rad)); $('#hServo').textContent = 'servo ' + E.servo + '°';
+  $('#hRgb').style.background = E.rgb || C.soft; $('#hPwm').textContent = Math.round(E.pwm * 100) + ' %';
+  const js = cmd ? JSON.stringify(cmd) : '—';
+  $('#handOut').innerHTML = `<div class="kv"><span>Dedos extendidos</span><span>${['pulgar', 'índice', 'medio', 'anular', 'meñique'].map((d, i) => r.ext[i] ? `<b>${d}</b>` : `<span style="opacity:.45">${d}</span>`).join(' · ')}</span>
+    <span>Regla</span><span>dedo extendido si |punta−muñeca| &gt; 1.12·|PIP−muñeca|</span>
+    <span>UDP → ESP32:4210</span><span>${esc(js)}</span></div>`;
+}
+onShow.vision = handBuild;
+
+/* --- YOLO --- */
+const YOLO = { t: 0, objs: [], fps: 0 };
+const YCOL = { persona: '#ff8a3d', montacargas: '#3db2ff', caja: '#e0b93a', dron: '#b583ff' };
+function yoloInit() {
+  YOLO.objs = [
+    { c: 'persona', x: .15, y: .78, vx: .00006, base: .91 }, { c: 'persona', x: .5, y: .72, vx: -.00005, base: .84 }, { c: 'persona', x: .85, y: .82, vx: -.00004, base: .62 },
+    { c: 'montacargas', x: .3, y: .8, vx: .00004, base: .88 }, { c: 'dron', x: .4, y: .2, vx: .00008, base: .55 },
+    { c: 'caja', x: .05, y: .47, vx: .00007, base: .93 }, { c: 'caja', x: .35, y: .47, vx: .00007, base: .9 }, { c: 'caja', x: .65, y: .47, vx: .00007, base: .78 }
+  ];
+}
+function yoloShape(x, o, W, H, fill) {
+  const px = o.x * W, py = o.y * H, s = H / 300;
+  x.beginPath();
+  if (o.c === 'persona') { x.arc(px, py - 52 * s, 8 * s, 0, 7); x.roundRect(px - 10 * s, py - 43 * s, 20 * s, 28 * s, 5 * s); x.rect(px - 9 * s, py - 16 * s, 7 * s, 16 * s); x.rect(px + 2 * s, py - 16 * s, 7 * s, 16 * s); }
+  else if (o.c === 'montacargas') { x.roundRect(px - 26 * s, py - 26 * s, 40 * s, 26 * s, 3 * s); x.rect(px + 14 * s, py - 50 * s, 5 * s, 50 * s); x.rect(px + 19 * s, py - 6 * s, 16 * s, 4 * s); x.rect(px - 18 * s, py - 46 * s, 20 * s, 20 * s); }
+  else if (o.c === 'caja') { x.rect(px - 14 * s, py - 22 * s, 28 * s, 22 * s); }
+  else { x.ellipse(px, py, 16 * s, 5 * s, 0, 0, 7); x.rect(px - 26 * s, py - 6 * s, 52 * s, 3 * s); }
+  if (fill) x.fill(); return s;
+}
+function yoloBox(o, W, H) {
+  const s = H / 300, px = o.x * W, py = o.y * H;
+  return { persona: [px - 11 * s, py - 61 * s, 22 * s, 61 * s], montacargas: [px - 27 * s, py - 51 * s, 63 * s, 51 * s], caja: [px - 15 * s, py - 23 * s, 30 * s, 23 * s], dron: [px - 27 * s, py - 8 * s, 54 * s, 14 * s] }[o.c];
+}
+function yoloStep(dt) {
+  YOLO.t += dt; if (!YOLO.objs.length) yoloInit();
+  const { x, w, h } = fit($('#yoloCv')); const thr = +$('#yoloConf').value;
+  $('#yoloConfo').textContent = thr.toFixed(2);
+  x.fillStyle = FEED_BG; x.fillRect(0, 0, w, h);
+  x.fillStyle = '#222c28'; x.fillRect(0, h * .55, w, h * .45);
+  x.fillStyle = '#2d3833'; x.fillRect(0, h * .47, w, h * .05);
+  for (let i = 0; i < 30; i++) { x.fillStyle = '#3a4741'; x.fillRect(((i * 40 + YOLO.t * .03) % (w + 40)) - 20, h * .47, 3, h * .05); }
+  axisText(x, 'banda transportadora', 8, h * .45, 'left', FEED_TXT, 9);
+  const zone = [[w * .56, h * .6], [w * .8, h * .6], [w * .86, h * .95], [w * .52, h * .95]];
+  x.fillStyle = 'rgba(255,70,60,.12)'; x.strokeStyle = 'rgba(255,90,74,.85)'; x.lineWidth = 2; x.setLineDash([6, 4]);
+  x.beginPath(); zone.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill(); x.stroke(); x.setLineDash([]);
+  axisText(x, 'zona restringida · prensa', w * .57, h * .58, 'left', '#ff8f80', 10);
+  x.fillStyle = '#3b4642'; x.fillRect(w * .62, h * .33, w * .14, h * .14); axisText(x, 'PRENSA', w * .69, h * .41, 'center', FEED_TXT, 10);
+  const inZone = (px, py) => { let c = false; for (let i = 0, j = zone.length - 1; i < zone.length; j = i++) { const [xi, yi] = zone[i], [xj, yj] = zone[j]; if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) c = !c; } return c; };
+  const counts = {}; let alarm = false, track = null, belt = true;
+  YOLO.objs.forEach(o => {
+    o.x += o.vx * dt; if (o.c === 'caja') { if (o.x > 1.05) o.x = -.05; } else if (o.x < .05 || o.x > .95) o.vx *= -1;
+    if (o.c === 'dron') o.y = .2 + .04 * Math.sin(YOLO.t / 600);
+    o.conf = clamp(o.base + Math.sin(YOLO.t / 500 + o.x * 9) * .08 + gauss() * .015, 0, .99);
+    x.fillStyle = '#56645e'; yoloShape(x, o, w, h, true);
+    if (o.conf < thr) return;
+    counts[o.c] = (counts[o.c] || 0) + 1;
+    const col = YCOL[o.c];
+    if ($('#yoloMask').checked) { x.fillStyle = col + '88'; yoloShape(x, o, w, h, true); }
+    if ($('#yoloBox').checked) {
+      const [bx, by, bw, bh] = yoloBox(o, w, h); x.strokeStyle = col; x.lineWidth = 2; x.strokeRect(bx, by, bw, bh);
+      const lbl = `${o.c} ${o.conf.toFixed(2)}`; x.font = '10px "JetBrains Mono", monospace'; const tw = x.measureText(lbl).width + 6;
+      x.fillStyle = col; x.fillRect(bx, by - 13, tw, 13); x.fillStyle = '#111'; x.textAlign = 'left'; x.fillText(lbl, bx + 3, by - 3);
+    }
+    if (o.c === 'persona') {
+      const fx = o.x * w, fy = o.y * h; x.fillStyle = col; x.beginPath(); x.arc(fx, fy, 3, 0, 7); x.fill();
+      if (inZone(fx, fy)) { alarm = true; belt = false; }
+      const dz = Math.abs(o.x - .68); if (!track || dz < track.dz) track = { o, dz };
+    }
+  });
+  if (alarm && Math.floor(YOLO.t / 300) % 2) { x.strokeStyle = '#ff4a3a'; x.lineWidth = 5; x.strokeRect(3, 3, w - 6, h - 6); }
+  axisText(x, `YOLOv8n-seg · ${Math.round(28 + Math.sin(YOLO.t / 900) * 3)} FPS · ${(21 + Math.sin(YOLO.t / 700) * 2).toFixed(1)} ms/frame`, 10, 16, 'left', FEED_TXT, 10);
+  $('#yAlarm').style.background = alarm ? C.bad : C.soft; $('#yAlarm').style.boxShadow = alarm ? `0 0 16px ${rgba(C.bad, .9)}` : 'none';
+  const pan = track ? Math.round(track.o.x * 180) : 90; const rad = (180 - pan) * Math.PI / 180;
+  $('#yNeedle').setAttribute('x2', 35 + 28 * Math.cos(rad)); $('#yNeedle').setAttribute('y2', 40 - 28 * Math.sin(rad)); $('#yPan').textContent = 'pan ' + pan + '°';
+  $('#yBelt').textContent = belt ? 'ON' : 'PARO'; $('#yBelt').style.color = belt ? C.ok : C.bad;
+  YOLO.ui = (YOLO.ui || 0) + dt;
+  if (YOLO.ui > 250) {
+    YOLO.ui = 0;
+    $('#yoloOut').innerHTML = `<div class="kv"><span>Detecciones</span><span>${Object.entries(counts).map(([k, v]) => `<span class="pill" style="color:${YCOL[k]};background:#1e2723">${k} ×${v}</span>`).join(' ') || 'ninguna sobre el umbral'}</span>
+      <span>MQTT planta/zona1/alarma</span><span>${alarm ? '<span class="pill bad">1 · persona dentro de la zona</span>' : '<span class="pill ok">0</span>'}</span>
+      <span>ESP32 actúa</span><span>${alarm ? 'relé GPIO26 = 1 (sirena), banda detenida' : 'banda en marcha'} · servo pan sigue a la persona más cercana a la prensa</span>
+      <span>Umbral alto</span><span>menos falsos positivos, pero puede perder a la persona con confianza baja (la de la derecha ronda 0.62)</span></div>`;
+  }
+}
+anim.vision = dt => { handStep(dt); yoloStep(dt); };
+/* ============ 10 ENJAMBRES ============ */
+const WW = 1000, WH = 600, BASE = [50, 555], RANGE = 300;
+const SW = { alg: 'pso', d: [], vic: [], dec: [], obs: [], it: 0, frame: 0, t: 0, msgs: 0, paused: false, cov: new Uint8Array(50 * 30), tau: new Float32Array(50 * 30), gbest: null, heat: null, log: [], done: false };
+const SWDESC = {
+  pso: ['Enjambre de partículas (PSO)', 'Cada dron recuerda el mejor punto que ha medido (pbest). El maestro conoce el mejor de todo el enjambre (gbest) y lo difunde por ESP-NOW. La velocidad combina inercia, memoria propia y memoria social.', 'v ← w·v + c₁r₁(pbest − x) + c₂r₂(gbest − x)\nx ← x + v      (w = 0.72, c₁ = c₂ = 1.49)', 'Calcula gbest con los reportes y lo transmite en broadcast.', 'Mide la señal, actualiza pbest y su velocidad.'],
+  abc: ['Colonia de abejas artificiales (ABC)', 'Las abejas obreras explotan una fuente de alimento cada una; las observadoras eligen fuentes según su calidad (ruleta) y las exploradoras abandonan las fuentes agotadas para buscar al azar.', 'v = xᵢ + φ(xᵢ − xₖ),  φ ∈ [−1, 1]\npⱼ = fitⱼ / Σ fit\nsi intentosᵢ > límite → exploradora', 'Guarda la tabla de fuentes y asigna roles: obrera, observadora o exploradora.', 'Vuela a su candidata, mide y aplica selección codiciosa.'],
+  aco: ['Colonia de hormigas (ACO)', 'Cada dron deja feromona virtual en las celdas donde mide señal. Los demás eligen la siguiente celda según la feromona y la señal local. La feromona se evapora para olvidar zonas ya rescatadas.', 'pᵢⱼ ∝ τᵢⱼ^α · ηᵢⱼ^β     (α = 1, β = 2)\nτ ← (1 − ρ)·τ + Δτ     (ρ = 0.02)', 'Mantiene el mapa de feromonas y lo comparte a los drones cercanos.', 'Elige celda vecina, deposita feromona proporcional a la señal.'],
+  ffa: ['Algoritmo de luciérnagas (Firefly)', 'El brillo de cada dron es la señal que mide. Cada dron se acerca a los más brillantes con una atracción que decae con la distancia, por lo que el enjambre se divide naturalmente entre varias víctimas.', 'xᵢ ← xᵢ + β₀·e^(−γr²)(xⱼ − xᵢ) + α(ε − ½)\nβ₀ = 0.9, γ = 1/(2·250²)', 'Retransmite el brillo de los drones fuera de alcance mutuo.', 'Compara su brillo con el de sus vecinos y se mueve.'],
+  cs: ['Búsqueda del cuco (Cuckoo Search)', 'Cada dron es un nido. Los cucos ponen huevos tras vuelos de Lévy: muchos pasos cortos y algunos saltos muy largos. Una fracción de los peores nidos se abandona en cada iteración.', 'xₙ = xᵢ + α ⊕ Lévy(λ = 1.5)\nsi f(xₙ) > f(xⱼ) → reemplazar nido j\nabandono pₐ = 0.25', 'Decide qué nidos se reemplazan y cuáles se abandonan.', 'Vuela al nuevo nido asignado y mide.'],
+  ba: ['Algoritmo de murciélagos (Bat)', 'Cada dron emite pulsos como un sonar. Ajusta su frecuencia para moverse respecto al mejor; al acercarse a una víctima baja el volumen (A) y sube la tasa de pulsos (r), refinando la búsqueda local.', 'fᵢ = fmin + (fmax − fmin)β\nvᵢ ← vᵢ + (xᵢ − x*)fᵢ ;  xᵢ ← xᵢ + vᵢ\nA ← 0.97·A ;  r ← r₀(1 − e^(−γt))', 'Difunde x* (mejor global) y el volumen promedio.', 'Actualiza frecuencia, velocidad, volumen y tasa de pulso.'],
+  mos: ['Zancudos: búsqueda de huésped (MHSA)', 'Inspirado en cómo un zancudo encuentra a una persona: vuela contra el viento buscando la pluma de CO₂ y calor; si la pierde, hace zigzag lateral (casting) hasta recuperarla. No necesita información global.', 'si señal > umbral: x ← x + paso·∇f/|∇f| + zigzag\nsi la señal cae: girar ±90° (casting)\nsin señal: vuelo de exploración', 'Solo registra hallazgos: el enjambre sigue funcionando aunque se pierda el maestro.', 'Mide con dos sensores laterales (antenas) y sigue el gradiente.']
+};
+function swRand() { return [rnd(80, WW - 40), rnd(40, WH - 80)]; }
+function swInsideObs(p) { return SW.obs.some(o => Math.hypot(p[0] - o[0], p[1] - o[1]) < o[2]); }
+function swNew() {
+  SW.obs = []; for (let i = 0; i < 5; i++) SW.obs.push([rnd(200, 900), rnd(80, 480), rnd(30, 55)]);
+  SW.vic = []; while (SW.vic.length < 5) { const p = swRand(); if (Math.hypot(p[0] - BASE[0], p[1] - BASE[1]) > 260 && !swInsideObs(p) && SW.vic.every(v => Math.hypot(v.x - p[0], v.y - p[1]) > 150)) SW.vic.push({ x: p[0], y: p[1], ok: false, t: 0 }); }
+  SW.dec = []; while (SW.dec.length < 2) { const p = swRand(); if (!swInsideObs(p) && SW.vic.every(v => Math.hypot(v.x - p[0], v.y - p[1]) > 140)) SW.dec.push({ x: p[0], y: p[1], off: false }); }
+  SW.t = 0; SW.msgs = 0; SW.it = 0; SW.done = false; SW.log = []; SW.best0 = 0; SW.stag = 0; swLog('sy', 'Nuevo escenario: 5 personas atrapadas, 2 focos de calor que confunden a los sensores.');
+  swInitDrones(); swHeat();
+}
+function swField(x, y) {
+  let f = 0;
+  for (const v of SW.vic) if (!v.ok) { const d2 = (x - v.x) ** 2 + (y - v.y) ** 2; f += Math.exp(-d2 / (2 * 85 * 85)) + .18 * Math.exp(-d2 / (2 * 280 * 280)); }
+  for (const d of SW.dec) if (!d.off) { const d2 = (x - d.x) ** 2 + (y - d.y) ** 2; f += .38 * Math.exp(-d2 / (2 * 55 * 55)); }
+  return f;
+}
+const swSense = (x, y) => swField(x, y) + gauss() * .008;
+function swInitDrones() {
+  const n = +$('#swN').value; SW.d = [];
+  for (let i = 0; i < n; i++) {
+    const a = rnd(-Math.PI / 2, 0), r = rnd(10, 60);
+    const x = BASE[0] + Math.cos(a) * r + 20, y = BASE[1] + Math.sin(a) * r;
+    SW.d.push({ i, x, y, tx: x + rnd(40, 300), ty: y - rnd(40, 300), vx: rnd(-30, 30), vy: rnd(-30, 30), pb: [x, y], pf: 0, f: 0, trail: [], role: 'emp', trial: 0, src: swRand(), srcF: 0, A: rnd(.8, 1), r: 0, r0: rnd(.3, .6), freq: 0, last: 0, head: rnd(-1.5, 0), cast: 1, cell: null, tabu: [], ring: 0 });
+  }
+  SW.tau.fill(.1); SW.cov.fill(0); SW.gbest = null;
+  if (SW.alg === 'abc') SW.d.forEach((d, i) => { d.role = i < n / 2 ? 'emp' : 'onl'; d.srcF = swField(...d.src); });
+}
+function swLog(c, s) { const m = Math.floor(SW.t / 60000), sec = (SW.t / 1000 % 60).toFixed(1).padStart(4, '0'); SW.log.push([c, `[${m}:${sec}] ${s}`]); if (SW.log.length > 60) SW.log.shift(); swLogUi(); }
+function swLogUi() { const el = $('#swLog'); el.innerHTML = SW.log.map(([c, s]) => `<div class="${c}">${esc(s)}</div>`).join(''); el.scrollTop = el.scrollHeight; }
+function levy() { const b = 1.5, su = Math.pow((1.3293 * Math.sin(Math.PI * b / 2)) / (0.9064 * b * Math.pow(2, (b - 1) / 2)), 1 / b); return gauss() * su / Math.pow(Math.abs(gauss()), 1 / b); }
+function swBest() { let b = null; SW.d.forEach(d => { const f = d.pf; if (!b || f > b.f) b = { x: d.pb[0], y: d.pb[1], f }; }); return b; }
+function swClampT(d) {
+  d.tx = clamp(d.tx, 15, WW - 15); d.ty = clamp(d.ty, 15, WH - 15);
+  for (const o of SW.obs) { const dx = d.tx - o[0], dy = d.ty - o[1], r = Math.hypot(dx, dy); if (r < o[2] + 10) { d.tx = o[0] + dx / (r || 1) * (o[2] + 12); d.ty = o[1] + dy / (r || 1) * (o[2] + 12); } }
+}
+function swStagnation(g, redisperse) {
+  if (g.f > (SW.best0 || 0) + .01) { SW.best0 = g.f; SW.stag = 0; return; }
+  if (++SW.stag > 22) { SW.stag = 0; SW.best0 = 0; redisperse(); swLog('sy', 'Maestro: sin mejora en 22 iteraciones → redispersa el 40 % del enjambre.'); }
+}
+function swIterate() {
+  SW.it++; const D = SW.d, n = D.length, alg = SW.alg;
+  D.forEach(d => { d.f = swSense(d.x, d.y); SW.msgs++; });
+  if (alg === 'pso') {
+    D.forEach(d => { d.pf = swField(...d.pb); if (d.f > d.pf) { d.pb = [d.x, d.y]; d.pf = d.f; } });
+    const g = swBest(); SW.gbest = g; SW.msgs++;
+    D.forEach(d => {
+      d.vx = .72 * d.vx + 1.49 * Math.random() * (d.pb[0] - d.x) + 1.49 * Math.random() * (g.x - d.x);
+      d.vy = .72 * d.vy + 1.49 * Math.random() * (d.pb[1] - d.y) + 1.49 * Math.random() * (g.y - d.y);
+      if (g.f < .06) { d.vx += gauss() * 40; d.vy += gauss() * 40; }
+      const sp = Math.hypot(d.vx, d.vy); if (sp > 110) { d.vx *= 110 / sp; d.vy *= 110 / sp; }
+      d.tx = d.x + d.vx; d.ty = d.y + d.vy;
+    });
+    swStagnation(g, () => D.slice(0, Math.ceil(n * .4)).forEach(d => { d.pb = swRand(); d.pf = 0; d.vx = gauss() * 60; d.vy = gauss() * 60; }));
+  } else if (alg === 'abc') {
+    const emp = D.filter(d => d.role !== 'onl');
+    emp.forEach(d => { d.srcF = swField(...d.src); });
+    const cand = (s, k) => [s[0] + rnd(-1, 1) * (s[0] - k[0]) + gauss() * 25, s[1] + rnd(-1, 1) * (s[1] - k[1]) + gauss() * 25];
+    emp.forEach(d => {
+      if (d.trial > 6) { d.role = 'sct'; d.src = swRand(); d.srcF = swField(...d.src); d.trial = 0; d.tx = d.src[0]; d.ty = d.src[1]; return; }
+      d.role = 'emp'; const k = emp[Math.floor(Math.random() * emp.length)].src, v = cand(d.src, k), fv = swField(...v);
+      if (fv > d.srcF) { d.src = v; d.srcF = fv; d.trial = 0; } else d.trial++;
+      d.tx = d.src[0]; d.ty = d.src[1];
+    });
+    const tot = emp.reduce((a, d) => a + d.srcF + .01, 0);
+    D.filter(d => d.role === 'onl').forEach(d => {
+      let r = Math.random() * tot, j = emp[0]; for (const e of emp) { r -= e.srcF + .01; if (r <= 0) { j = e; break; } }
+      const k = emp[Math.floor(Math.random() * emp.length)].src, v = cand(j.src, k), fv = swField(...v);
+      if (fv > j.srcF) { j.src = v; j.srcF = fv; j.trial = 0; } else j.trial++;
+      d.tx = v[0]; d.ty = v[1];
+    });
+    const b = emp.reduce((a, d) => d.srcF > a.srcF ? d : a, emp[0]); SW.gbest = { x: b.src[0], y: b.src[1], f: b.srcF };
+  } else if (alg === 'ffa') {
+    const alpha = Math.max(14, 60 * Math.pow(.985, SW.it)), g = 1 / (2 * 250 * 250);
+    const pos = D.map(d => [d.x, d.y, d.f]);
+    D.forEach((d, i) => {
+      let mx = 0, my = 0, any = false;
+      pos.forEach((q, j) => { if (j !== i && q[2] > d.f + .005) { const r2 = (q[0] - d.x) ** 2 + (q[1] - d.y) ** 2, b = .9 * Math.exp(-g * r2); mx += b * (q[0] - d.x); my += b * (q[1] - d.y); any = true; } });
+      const k = any ? .5 : 1;
+      d.tx = d.x + mx * .35 + alpha * gauss() * k; d.ty = d.y + my * .35 + alpha * gauss() * k;
+    });
+    const b = D.reduce((a, d) => d.f > a.f ? d : a, D[0]); SW.gbest = { x: b.x, y: b.y, f: b.f };
+    swStagnation(SW.gbest, () => D.slice(0, Math.ceil(n * .4)).forEach(d => { const p = swRand(); d.tx = p[0]; d.ty = p[1]; }));
+    if (SW.stag === 0 && SW.best0 === 0) { D.forEach(swClampT); return; }
+  } else if (alg === 'cs') {
+    D.forEach(d => { d.pf = swField(d.tx, d.ty); });
+    const best = D.reduce((a, d) => d.pf > a.pf ? d : a, D[0]); SW.gbest = { x: best.tx, y: best.ty, f: best.pf };
+    D.forEach(d => {
+      const st = [levy(), levy()].map(v => clamp(v, -12, 12));
+      const nx = d.tx + 18 * st[0] + .25 * (best.tx - d.tx) * Math.random(), ny = d.ty + 18 * st[1] + .25 * (best.ty - d.ty) * Math.random();
+      const fn = swField(nx, ny), j = D[Math.floor(Math.random() * n)];
+      if (fn > j.pf) { j.tx = nx; j.ty = ny; j.pf = fn; j.ring = 1; }
+    });
+    const sorted = [...D].sort((a, b) => a.pf - b.pf);
+    sorted.slice(0, Math.floor(n * .25)).forEach(d => { if (Math.random() < .5) { const p = swRand(); d.tx = p[0]; d.ty = p[1]; } else { const a = D[Math.floor(Math.random() * n)], b = D[Math.floor(Math.random() * n)]; d.tx += Math.random() * (a.tx - b.tx); d.ty += Math.random() * (a.ty - b.ty); } });
+  } else if (alg === 'ba') {
+    D.forEach(d => { d.pf = swField(...d.pb); if (d.f > d.pf) { d.pb = [d.x, d.y]; d.pf = d.f; } });
+    const g = swBest(); SW.gbest = g; const Aavg = D.reduce((a, d) => a + d.A, 0) / n;
+    D.forEach(d => {
+      d.freq = rnd(0, .55);
+      d.vx = .8 * d.vx + (g.x - d.x) * d.freq; d.vy = .8 * d.vy + (g.y - d.y) * d.freq;
+      if (g.f < .06) { d.vx += gauss() * 45; d.vy += gauss() * 45; }
+      let nx = d.x + d.vx, ny = d.y + d.vy;
+      if (Math.random() > d.r) { nx = g.x + gauss() * 70 * Aavg; ny = g.y + gauss() * 70 * Aavg; }
+      const fn = swField(nx, ny);
+      if (Math.random() < d.A || fn > d.f) { d.tx = nx; d.ty = ny; if (fn > d.f) { d.A *= .97; d.r = d.r0 * (1 - Math.exp(-.08 * SW.it)); } }
+      else { d.tx = d.x + d.vx * .3; d.ty = d.y + d.vy * .3; }
+      if (d.A < .25) d.A = .25;
+      d.ring = 1;
+    });
+    swStagnation(g, () => D.slice(0, Math.ceil(n * .4)).forEach(d => { d.pb = swRand(); d.pf = 0; d.A = 1; d.r = 0; d.vx = gauss() * 60; d.vy = gauss() * 60; }));
+  }
+  D.forEach(swClampT);
+}
+function swStepLocal(d) {
+  const alg = SW.alg;
+  if (alg === 'aco') {
+    const cx = clamp(Math.floor(d.x / 20), 0, 49), cy = clamp(Math.floor(d.y / 20), 0, 29);
+    if (d.cell && Math.hypot(d.tx - d.x, d.ty - d.y) > 6) return;
+    const f = swSense(d.x, d.y); SW.tau[cy * 50 + cx] += 1.2 * f; SW.msgs++;
+    d.tabu.push(cy * 50 + cx); if (d.tabu.length > 10) d.tabu.shift();
+    let opts = [], tot = 0;
+    for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+      if (!ox && !oy) continue; const nx = cx + ox, ny = cy + oy; if (nx < 0 || ny < 0 || nx > 49 || ny > 29) continue;
+      const id = ny * 50 + nx, p = [nx * 20 + 10, ny * 20 + 10]; if (swInsideObs(p)) continue;
+      let wgt = Math.pow(SW.tau[id], 1) * Math.pow(swField(...p) + .03, 2) * (d.tabu.includes(id) ? .05 : 1);
+      opts.push([p, wgt]); tot += wgt;
+    }
+    let r = Math.random() * tot; let pick = opts[0];
+    for (const o of opts) { r -= o[1]; if (r <= 0) { pick = o; break; } }
+    if (pick) { d.tx = pick[0][0]; d.ty = pick[0][1]; } d.cell = 1;
+  } else if (alg === 'mos') {
+    if (Math.hypot(d.tx - d.x, d.ty - d.y) > 8) return;
+    const f = swSense(d.x, d.y), dl = 14; SW.msgs++;
+    const gx = (swSense(d.x + dl, d.y) - swSense(d.x - dl, d.y)) / (2 * dl), gy = (swSense(d.x, d.y + dl) - swSense(d.x, d.y - dl)) / (2 * dl), gm = Math.hypot(gx, gy);
+    if (f > .03 && gm > 1e-5) {
+      let hd = Math.atan2(gy, gx);
+      if (f < d.last - .004) { d.cast *= -1; hd += d.cast * Math.PI / 2; d.mode = 'casting'; } else d.mode = 'surge';
+      const zig = (1 - clamp(f, 0, 1)) * .7 * Math.sin(SW.frame / 9 + d.i);
+      d.head = hd + zig; const step = 26 + 20 * (1 - clamp(f, 0, 1));
+      d.tx = d.x + Math.cos(d.head) * step; d.ty = d.y + Math.sin(d.head) * step;
+    } else {
+      d.mode = 'exploración'; d.head += gauss() * .6 + .15 * d.cast; if (Math.random() < .05) d.cast *= -1;
+      const L = Math.random() < .08 ? 140 : 40; d.tx = d.x + Math.cos(d.head) * L; d.ty = d.y + Math.sin(d.head) * L;
+    }
+    d.last = f;
+    if (d.tx < 20 || d.tx > WW - 20 || d.ty < 20 || d.ty > WH - 20) d.head += Math.PI * .8;
+    swClampT(d);
+  }
+}
+function swPhysics(d, sp) {
+  const dx = d.tx - d.x, dy = d.ty - d.y, r = Math.hypot(dx, dy), vmax = 2.4 * sp;
+  if (r > .5) { const s = Math.min(vmax, r); d.x += dx / r * s; d.y += dy / r * s; }
+  for (const o of SW.obs) { const ox = d.x - o[0], oy = d.y - o[1], rr = Math.hypot(ox, oy); if (rr < o[2] + 6) { d.x = o[0] + ox / (rr || 1) * (o[2] + 6); d.y = o[1] + oy / (rr || 1) * (o[2] + 6); } }
+  d.x = clamp(d.x, 5, WW - 5); d.y = clamp(d.y, 5, WH - 5);
+  SW.cov[clamp(Math.floor(d.y / 20), 0, 29) * 50 + clamp(Math.floor(d.x / 20), 0, 49)] = 1;
+  if (SW.frame % 4 === 0) { d.trail.push([d.x, d.y]); if (d.trail.length > 14) d.trail.shift(); }
+  for (const q of SW.dec) if (!q.off && Math.hypot(d.x - q.x, d.y - q.y) < 20) { q.off = true; swHeat(); SW.best0 = 0; swLog('er', `Dron ${d.i + 1} revisó un foco térmico en (${q.x.toFixed(0)}, ${q.y.toFixed(0)}) con la cámara: no es una persona, descartado.`); }
+  for (const v of SW.vic) if (!v.ok && Math.hypot(d.x - v.x, d.y - v.y) < 20) {
+    v.ok = true; SW.best0 = 0; v.t = SW.t; v.by = d.i; swHeat(); SW.msgs += 2;
+    const k = SW.vic.filter(q => q.ok).length;
+    swLog('', `Dron ${d.i + 1} localizó a una persona en (${v.x.toFixed(0)}, ${v.y.toFixed(0)}) → maestro. Rescatadas ${k}/5`);
+    if (k === 5) { SW.done = true; swLog('sy', `Misión completa en ${(SW.t / 1000).toFixed(1)} s con ${SW.algName()}.`); }
+  }
+}
+SW.algName = () => SWDESC[SW.alg][0];
+function swHeat() {
+  const c = document.createElement('canvas'); c.width = 100; c.height = 60; const x = c.getContext('2d'); const im = x.createImageData(100, 60);
+  const col = C.copper; const n = parseInt(col.slice(1), 16), R = n >> 16 & 255, G = n >> 8 & 255, B = n & 255;
+  for (let j = 0; j < 60; j++) for (let i = 0; i < 100; i++) { const f = clamp(swField(i * 10 + 5, j * 10 + 5), 0, 1.2) / 1.2, k = (j * 100 + i) * 4; im.data[k] = R; im.data[k + 1] = G; im.data[k + 2] = B; im.data[k + 3] = Math.round(Math.pow(f, .8) * 150); }
+  x.putImageData(im, 0, 0); SW.heat = c;
+}
+function swParent(d) {
+  if (Math.hypot(d.x - BASE[0], d.y - BASE[1]) < RANGE) return BASE;
+  let best = null, bd = Infinity;
+  SW.d.forEach(o => { if (o === d) return; const dm = Math.hypot(o.x - BASE[0], o.y - BASE[1]), dd = Math.hypot(o.x - d.x, o.y - d.y); if (dd < RANGE && dm < Math.hypot(d.x - BASE[0], d.y - BASE[1]) - 20 && dd < bd) { bd = dd; best = [o.x, o.y]; } });
+  return best;
+}
+function swDraw() {
+  const { x, w, h } = fit($('#swCv')); x.clearRect(0, 0, w, h);
+  const s = Math.min(w / WW, h / WH), ox = (w - WW * s) / 2, oy = (h - WH * s) / 2, P = (px, py) => [ox + px * s, oy + py * s];
+  x.fillStyle = C.bg; x.fillRect(ox, oy, WW * s, WH * s);
+  x.strokeStyle = rgba(C.line, .6); x.lineWidth = 1; for (let i = 0; i <= WW; i += 100) { x.beginPath(); x.moveTo(...P(i, 0)); x.lineTo(...P(i, WH)); x.stroke(); } for (let j = 0; j <= WH; j += 100) { x.beginPath(); x.moveTo(...P(0, j)); x.lineTo(...P(WW, j)); x.stroke(); }
+  if ($('#swHeat').checked && SW.heat) { x.imageSmoothingEnabled = true; x.drawImage(SW.heat, ox, oy, WW * s, WH * s); }
+  if (SW.alg === 'aco') { const mx = Math.max(.5, ...SW.tau); for (let k = 0; k < 1500; k++) { const v = SW.tau[k]; if (v > .15) { x.fillStyle = rgba(C.vio, Math.min(.55, v / mx * .7)); const [px, py] = P((k % 50) * 20, Math.floor(k / 50) * 20); x.fillRect(px, py, 20 * s, 20 * s); } } }
+  SW.obs.forEach(o => { const [px, py] = P(o[0], o[1]); x.fillStyle = rgba(C.muted, .35); x.strokeStyle = C.muted; x.beginPath(); x.arc(px, py, o[2] * s, 0, 7); x.fill(); x.stroke(); });
+  axisText(x, 'escombros', ...P(SW.obs[0][0], SW.obs[0][1] + 4), 'center', C.ink, 9);
+  SW.dec.forEach(d => { const [px, py] = P(d.x, d.y); x.strokeStyle = d.off ? C.muted : rgba(C.warn, .8); x.setLineDash([3, 3]); x.beginPath(); x.arc(px, py, 10 * s + 4, 0, 7); x.stroke(); x.setLineDash([]); axisText(x, d.off ? 'descartado' : 'foco térmico', px, py - 14 * s - 4, 'center', d.off ? C.muted : C.warn, 9); });
+  SW.vic.forEach(v => {
+    const [px, py] = P(v.x, v.y);
+    if (v.ok) { x.strokeStyle = C.ok; x.lineWidth = 2.5; x.beginPath(); x.arc(px, py, 12, 0, 7); x.stroke(); x.beginPath(); x.moveTo(px - 5, py); x.lineTo(px - 1, py + 4); x.lineTo(px + 6, py - 4); x.stroke(); }
+    else { x.fillStyle = rgba(C.bad, .55); x.beginPath(); x.arc(px, py - 5, 3.5, 0, 7); x.fill(); x.fillRect(px - 3, py - 1, 6, 8); }
+  });
+  if ($('#swLinks').checked) SW.d.forEach(d => { const p = swParent(d); const a = P(d.x, d.y); x.strokeStyle = p ? (p === BASE ? rgba(C.info, .35) : rgba(C.vio, .6)) : rgba(C.bad, .5); x.setLineDash(p ? [] : [2, 4]); x.lineWidth = 1; if (p) { const b = P(p[0], p[1]); x.beginPath(); x.moveTo(...a); x.lineTo(...b); x.stroke(); } x.setLineDash([]); });
+  const [bx, by] = P(...BASE); x.strokeStyle = rgba(C.info, .25); x.setLineDash([4, 6]); x.beginPath(); x.arc(bx, by, RANGE * s, -Math.PI / 2, 0); x.stroke(); x.setLineDash([]);
+  x.fillStyle = C.info; x.fillRect(bx - 14, by - 10, 28, 20); x.fillStyle = C.panel; x.font = 'bold 9px "JetBrains Mono", monospace'; x.textAlign = 'center'; x.fillText('ESP', bx, by + 3);
+  axisText(x, 'MAESTRO', bx, by - 16, 'center', C.info, 10);
+  if (SW.gbest && SW.alg !== 'mos' && SW.alg !== 'aco') { const [gx, gy] = P(SW.gbest.x, SW.gbest.y); x.strokeStyle = C.ink; x.lineWidth = 1.5; x.beginPath(); x.moveTo(gx - 9, gy); x.lineTo(gx + 9, gy); x.moveTo(gx, gy - 9); x.lineTo(gx, gy + 9); x.stroke(); x.beginPath(); x.arc(gx, gy, 6, 0, 7); x.stroke(); }
+  SW.d.forEach(d => {
+    const [px, py] = P(d.x, d.y);
+    if (d.trail.length > 1) { x.strokeStyle = rgba(C.pcb, .3); x.lineWidth = 1.5; x.beginPath(); d.trail.forEach((t, k) => { const q = P(t[0], t[1]); k ? x.lineTo(...q) : x.moveTo(...q); }); x.stroke(); }
+    let col = C.pcb;
+    if (SW.alg === 'abc') col = d.role === 'emp' ? C.gold : d.role === 'onl' ? C.copper : C.info;
+    if (SW.alg === 'ffa') { const b = clamp(d.f, 0, 1); x.fillStyle = rgba(C.gold, .15 + b * .5); x.beginPath(); x.arc(px, py, 6 + b * 22, 0, 7); x.fill(); col = C.gold; }
+    if (SW.alg === 'ba' && d.ring > 0) { x.strokeStyle = rgba(C.vio, d.ring * .6); x.lineWidth = 1.2; x.beginPath(); x.arc(px, py, (1 - d.ring) * 40 * d.A + 6, 0, 7); x.stroke(); col = C.vio; }
+    if (SW.alg === 'cs' && d.ring > 0) { x.strokeStyle = rgba(C.info, d.ring); x.beginPath(); x.arc(px, py, (1 - d.ring) * 18 + 6, 0, 7); x.stroke(); col = C.info; }
+    if (SW.alg === 'mos') col = d.mode === 'surge' ? C.bad : d.mode === 'casting' ? C.warn : C.muted;
+    if (SW.alg === 'aco') col = C.vio;
+    x.strokeStyle = col; x.lineWidth = 1.6; x.beginPath(); x.moveTo(px - 5, py - 5); x.lineTo(px + 5, py + 5); x.moveTo(px + 5, py - 5); x.lineTo(px - 5, py + 5); x.stroke();
+    x.fillStyle = col; [[-5, -5], [5, 5], [5, -5], [-5, 5]].forEach(([a, b]) => { x.beginPath(); x.arc(px + a, py + b, 2.4, 0, 7); x.fill(); });
+  });
+  if (SW.alg === 'mos') { x.strokeStyle = C.muted; x.lineWidth = 1.5; const [ax, ay] = P(930, 40); x.beginPath(); x.moveTo(ax - 30, ay); x.lineTo(ax + 10, ay); x.lineTo(ax + 3, ay - 5); x.moveTo(ax + 10, ay); x.lineTo(ax + 3, ay + 5); x.stroke(); axisText(x, 'viento', ax - 10, ay - 8, 'center', C.muted, 9); }
+  if (SW.done) { x.fillStyle = rgba(C.ok, .9); x.fillRect(w / 2 - 150, 12, 300, 26); axisText(x, 'Misión completa · 5/5 personas localizadas', w / 2, 29, 'center', '#fff', 12); }
+}
+function swStats() {
+  const ok = SW.vic.filter(v => v.ok).length, cov = SW.cov.reduce((a, b) => a + b, 0) / SW.cov.length;
+  const relay = SW.d.filter(d => Math.hypot(d.x - BASE[0], d.y - BASE[1]) >= RANGE).length, lost = SW.d.filter(d => !swParent(d)).length;
+  $('#swStats').innerHTML = `<div class="kv"><span>Algoritmo</span><span><b>${SW.algName()}</b></span>
+  <span>Tiempo de misión</span><span>${(SW.t / 1000).toFixed(1)} s · iteración ${SW.it}</span>
+  <span>Personas localizadas</span><span>${ok} / 5 ${ok === 5 ? '<span class="pill ok">completo</span>' : ''}</span>
+  <span>Cobertura del área</span><span>${(cov * 100).toFixed(1)} %</span>
+  <span>Mensajes ESP-NOW</span><span>${SW.msgs.toLocaleString('es')}</span>
+  <span>Mejor señal conocida</span><span>${SW.gbest ? SW.gbest.f.toFixed(3) : '—'}</span>
+  <span>Enlaces</span><span>${SW.d.length - relay} directos al maestro · ${relay - lost} por relevo · ${lost ? `<span class="pill bad">${lost} sin enlace</span>` : '0 sin enlace'}</span></div>`;
+}
+function swDesc() {
+  const D = SWDESC[SW.alg];
+  $('#swDesc').innerHTML = `<span class="tag">Algoritmo activo</span><h3>${D[0]}</h3><p>${D[1]}</p><pre class="code">${esc(D[2])}</pre>
+  <div class="kv" style="font-size:.88rem"><span>Maestro (base)</span><span>${D[3]}</span><span>Esclavo (dron)</span><span>${D[4]}</span></div>`;
+}
+$('#swAlg').onchange = () => { SW.alg = $('#swAlg').value; SW.t = 0; SW.it = 0; SW.msgs = 0; SW.done = false; SW.vic.forEach(v => v.ok = false); SW.dec.forEach(q => q.off = false); SW.best0 = 0; SW.stag = 0; swHeat(); swInitDrones(); swDesc(); swLog('sy', 'Algoritmo cambiado a ' + SW.algName() + ' en el mismo escenario.'); };
+$('#swN').oninput = () => { $('#swNo').textContent = $('#swN').value; swInitDrones(); };
+$('#swSpeed').oninput = () => $('#swSpeedo').textContent = $('#swSpeed').value + '×';
+$('#swReset').onclick = swNew;
+$('#swPause').onclick = () => { SW.paused = !SW.paused; $('#swPause').textContent = SW.paused ? 'Continuar' : 'Pausar'; };
+let swStatT = 0;
+anim.enjambre = dt => {
+  if (!SW.vic.length) { SW.alg = $('#swAlg').value; swNew(); }
+  if (!SW.paused && !SW.done) {
+    const sp = +$('#swSpeed').value; const reps = Math.max(1, Math.round(sp)); const spe = sp / reps;
+    for (let r = 0; r < reps; r++) {
+      SW.frame++; SW.t += dt * spe;
+      if (['pso', 'abc', 'ffa', 'cs', 'ba'].includes(SW.alg) && SW.frame % 14 === 0) swIterate();
+      if (SW.alg === 'aco') { if (SW.frame % 14 === 0) { for (let k = 0; k < SW.tau.length; k++) SW.tau[k] = Math.max(.1, SW.tau[k] * .98); SW.it++; } SW.d.forEach(swStepLocal); }
+      if (SW.alg === 'mos') { if (SW.frame % 14 === 0) SW.it++; SW.d.forEach(swStepLocal); }
+      SW.d.forEach(d => { swPhysics(d, spe * (dt / 16.7)); d.ring = Math.max(0, d.ring - .03); });
+    }
+  }
+  swDraw(); swStatT += dt; if (swStatT > 300) { swStatT = 0; swStats(); }
+};
+onShow.enjambre = () => { if (!SW.vic.length) { SW.alg = $('#swAlg').value; swNew(); } $('#swNo').textContent = $('#swN').value; $('#swSpeedo').textContent = $('#swSpeed').value + '×'; swDesc(); swHeat(); swDraw(); swStats(); swLogUi(); };
+/* ============ 11 PREGUNTAS ============ */
+const QS = [
+  ['Pines y señales', [
+    ['Análisis', 'Un compañero conectó un pulsador con pull-up externo a GPIO12 y ahora la placa no arranca después de cada reset. Explica la causa eléctrica, por qué solo ocurre al arrancar y propón dos soluciones distintas.', ['Identifica GPIO12 (MTDI) como pin de strapping que fija VDD_SDIO', 'Explica que en alto selecciona 1.8 V y la flash de 3.3 V deja de responder', 'Distingue el instante del reset del funcionamiento normal', 'Propone mover el botón a otro GPIO o fijar la tensión con espefuse (set_flash_voltage 3.3V)']],
+    ['Diseño', 'Debes leer 6 sensores analógicos mientras el ESP32 publica por Wi-Fi. ¿Qué pines eliges y por qué? ¿Qué harías si necesitas un séptimo canal?', ['Usa ADC1 (GPIO32–39) porque ADC2 falla con Wi-Fi activo', 'Cuenta los canales disponibles de ADC1 en el WROOM', 'Propone multiplexor analógico (CD4051) o ADC externo I²C (ADS1115)', 'Considera atenuación y calibración']],
+    ['Cálculo', 'Necesitas un PWM de 25 kHz para un ventilador industrial y la mayor resolución posible. Calcula la resolución máxima en bits y el paso mínimo de ciclo de trabajo resultante.', ['Aplica f·2^n ≤ 80 MHz', 'Obtiene n = 11 bits (25 kHz · 2048 = 51.2 MHz)', 'Calcula el paso ≈ 0.049 %', 'Justifica por qué 12 bits no es posible']],
+    ['Crítica', 'Un estudiante calcula el voltaje como raw·3.3/4095 con atenuación de 11 dB y obtiene errores de hasta 200 mV. Explica el origen del error y cómo corregirlo en firmware.', ['Reconoce la no linealidad y la zona muerta del ADC del ESP32', 'Menciona la calibración de eFuse (read_uv, analogReadMilliVolts)', 'Recomienda operar dentro del rango lineal o cambiar la atenuación', 'Sugiere promediado o filtrado para el ruido']]
+  ]],
+  ['Conectividad y modelo OSI', [
+    ['Comparación', '¿Por qué ESP-NOW tiene menor latencia que Wi-Fi con MQTT si ambos usan la misma radio? Argumenta desde las capas OSI que cada uno recorre.', ['Señala que ESP-NOW no tiene capas 3–5 (sin IP, TCP ni sesión)', 'Menciona asociación, DHCP, handshake TCP y TLS como costos de Wi-Fi', 'Explica el uso de tramas de acción 802.11 directas por MAC', 'Identifica lo que se pierde: enrutamiento, fiabilidad extremo a extremo']],
+    ['Diseño', 'Una pulsera médica envía el ritmo cardiaco cada segundo a un móvil y debe durar una semana con una batería pequeña. ¿Bluetooth clásico o BLE? Justifica con al menos tres argumentos técnicos.', ['Elige BLE', 'Argumenta consumo por eventos de conexión cortos y modos de sueño', 'Usa GATT con notificaciones y un perfil estándar (Heart Rate 0x180D)', 'Compara con la conexión continua y el ancho de banda de BR/EDR']],
+    ['Análisis', 'Ubica en qué capa OSI actúa cada mecanismo de seguridad: WPA2, TLS, CCMP de ESP-NOW y LE Secure Connections. ¿Qué protege cada uno y qué deja expuesto?', ['WPA2 y CCMP en la capa 2: protegen el salto inalámbrico', 'TLS en la capa 6 (o entre 4 y 7): protege extremo a extremo', 'LE Secure Connections en el emparejamiento BLE', 'Concluye que la capa 2 no protege más allá del punto de acceso']]
+  ]],
+  ['Interrupciones, hilos y doble núcleo', [
+    ['Análisis', 'En el simulador, la ISR pesada provocó el error "Interrupt wdt timeout". Explica por qué llamar a Serial.print() y delay() dentro de una ISR es peligroso y reescribe la solución con una cola de FreeRTOS.', ['Explica que la ISR bloquea al núcleo y a otras interrupciones', 'Menciona el watchdog de interrupciones (300 ms por defecto)', 'Usa xQueueSendFromISR y una tarea consumidora', 'Incluye IRAM_ATTR y portYIELD_FROM_ISR']],
+    ['Diseño', 'Tienes cuatro tareas: control PID a 1 kHz, lectura de un sensor I²C, publicación MQTT y una pantalla OLED. Asigna núcleo y prioridad a cada una y justifica tu reparto.', ['PID en núcleo 1 con la prioridad más alta de la aplicación', 'MQTT en núcleo 0 junto a la pila Wi-Fi', 'Mutex para el bus I²C compartido por sensor y OLED', 'Usa vTaskDelayUntil para periodos exactos']],
+    ['Concepto', 'Diferencia rutina, corrutina e hilo con un ejemplo concreto del ESP32 para cada uno. ¿Cuándo una corrutina es mejor opción que un hilo de FreeRTOS?', ['Define quién decide el cambio de contexto en cada caso', 'Ejemplos: loop(), async def con await, xTaskCreate', 'La corrutina usa menos RAM (sin pila propia) y evita condiciones de carrera', 'El hilo gana cuando hay cómputo pesado o se necesita paralelismo real']],
+    ['Crítica', 'El simulador mostró colisiones en el bus I²C sin mutex. ¿Por qué un simple flag booleano compartido no resuelve el problema entre dos núcleos?', ['Explica la condición de carrera entre leer y escribir el flag', 'Menciona que cada núcleo ejecuta en paralelo real', 'Propone mutex de FreeRTOS o portMUX con secciones críticas', 'Menciona herencia de prioridad']]
+  ]],
+  ['asyncio en MicroPython', [
+    ['Análisis', 'Al inyectar time.sleep(1) todas las tareas se retrasaron, no solo la que lo ejecutó. Explica por qué usando el concepto de multitarea cooperativa.', ['Un solo hilo ejecuta todas las corrutinas', 'El ciclo de eventos solo recupera el control en un await', 'time.sleep bloquea; asyncio.sleep cede', 'Propone await asyncio.sleep_ms()']],
+    ['Diseño', 'Escribe la estructura de una corrutina que pueda pausarse y reanudarse desde otra tarea sin perder su estado. ¿Por qué no basta con cancelarla y crearla de nuevo?', ['Usa asyncio.Event con wait(), clear() y set()', 'Coloca el punto de pausa en un lugar seguro del ciclo', 'Explica que cancelar pierde variables locales y progreso', 'Considera liberar recursos antes de pausar']],
+    ['Análisis', 'Sin asyncio.Lock() los mensajes de MQTT y LOG se mezclaron en la UART aunque solo hay un hilo. ¿Cómo es posible una condición de carrera sin paralelismo?', ['Identifica el await dentro de la escritura por fragmentos', 'Cualquier await es un punto donde otra tarea puede intercalarse', 'async with lock hace atómica la sección completa', 'Menciona que el lock se libera incluso al cancelar']],
+    ['Concepto', '¿Qué ocurre con una tarea que espera el Lock cuando la tarea que lo tiene es cancelada? Relaciónalo con CancelledError y el bloque finally.', ['task.cancel() lanza CancelledError en el await pendiente', 'async with o finally liberan el lock', 'La siguiente tarea en espera adquiere el lock', 'Advierte del riesgo de capturar CancelledError sin relanzarla']]
+  ]],
+  ['Docker, cifrado y blockchain', [
+    ['Crítica', 'Alguien propone "instalar Docker en el ESP32" para la planta. Explica por qué no es posible y describe dónde sí aporta valor Docker en un proyecto con 200 nodos ESP32.', ['ESP32: sin MMU, sin Linux, 520 KB de RAM', 'Docker en la pasarela: broker, base de datos, dashboards, OTA', 'Docker para compilar con la imagen espressif/idf y pruebas en QEMU', 'Reproducibilidad y despliegue escalonado']],
+    ['Análisis', 'En el simulador, al apagar Mosquitto los ESP32 acumularon mensajes en buffer. ¿Qué QoS de MQTT y qué estrategia de almacenamiento usarías para no perder datos críticos?', ['QoS 1 o 2 con sesión persistente', 'Buffer circular en flash (LittleFS) con límite', 'Marca de tiempo propia en cada lectura', 'Política al llenarse: descartar la más vieja o reducir frecuencia']],
+    ['Comparación', 'AES-CBC con cryptolib frente a AES-GCM con mbedTLS: ¿qué ofrece GCM que CBC no ofrece? Usa el experimento de "alterar 1 byte" para justificar.', ['GCM es cifrado autenticado (etiqueta de 16 B)', 'CBC sin MAC no detecta la alteración', 'El IV nunca debe repetirse con la misma clave en GCM', 'Propone HMAC-SHA256 si se usa CBC']],
+    ['Diseño', '¿Tiene sentido que un ESP32 mine bloques de una blockchain? Propón una arquitectura realista para registrar lecturas industriales inmutables usando el ESP32.', ['Compara la tasa de hash del ESP32 con la de redes reales', 'El ESP32 firma cada lectura (ECDSA/Ed25519) con clave en eFuse o elemento seguro', 'La pasarela agrupa y ancla los hashes en la cadena', 'Analiza costos, latencia y consumo']]
+  ]],
+  ['Visión artificial y enjambres', [
+    ['Diseño', 'Diseña el protocolo de mensajes entre el PC con MediaPipe y el ESP32 que mueve un brazo robótico. ¿UDP, MQTT o serie? ¿Qué pasa si se pierde un paquete?', ['Compara latencia y fiabilidad de cada medio', 'Formato compacto (JSON corto o binario) con número de secuencia', 'Comportamiento seguro ante pérdida: tiempo de espera y posición de reposo', 'Filtrado del gesto para evitar órdenes intermitentes (histéresis)']],
+    ['Análisis', 'Con umbral de confianza 0.7, YOLO dejó de ver a una persona dentro de la zona restringida. Discute el compromiso entre falsos positivos y falsos negativos en una aplicación de seguridad industrial.', ['En seguridad un falso negativo es más grave', 'Propone umbral más bajo con confirmación en varios fotogramas', 'Menciona seguimiento (tracking) y fusión con sensores del ESP32 (PIR, radar)', 'Considera iluminación y oclusiones']],
+    ['Comparación', 'Ejecuta PSO y el algoritmo de zancudos en el mismo escenario. ¿Cuál cae más en los focos térmicos falsos? Relaciona tu observación con el uso de información global o local.', ['Reporta tiempos y personas encontradas en ambos', 'PSO puede converger a un óptimo local por gbest', 'MHSA es local y reactivo: explora más pero puede tardar', 'Propone mecanismos de diversidad o reinicio']],
+    ['Diseño', 'Si el maestro falla a mitad de la misión, ¿qué algoritmos siguen funcionando y cuáles se degradan? Propón un mecanismo de elección de un nuevo maestro con ESP-NOW.', ['PSO, BA y CS dependen del mejor global', 'Firefly, ACO local y MHSA toleran mejor la pérdida', 'Elección por MAC más alta, batería o algoritmo de Bully', 'Latidos (heartbeats) periódicos y tiempo de espera']],
+    ['Síntesis', 'El alcance de ESP-NOW limita a los drones lejanos. Propón cómo combinar el algoritmo de búsqueda con el mantenimiento de la conectividad (relevos) sin perder eficiencia de exploración.', ['Identifica el relevo multisalto observado en la simulación', 'Penaliza en la función objetivo alejarse del vecino más cercano', 'Reserva algunos drones como repetidores', 'Considera el modo LR de ESP-NOW y la latencia por salto']]
+  ]]
+];
+function qBuild() {
+  let n = 0;
+  $('#qList').innerHTML = QS.map(([g, qs]) => `<div class="qgroup"><h3>${g}</h3>` + qs.map(([lvl, q, crit]) => { n++; const id = 'q' + n; return `<div class="q"><div class="qh"><span class="qn">P${n}</span><div><div class="lvl">${lvl}</div><p>${esc(q)}</p></div></div>
+    <textarea id="${id}" data-q="${n}" aria-label="Respuesta a la pregunta ${n}" placeholder="Escribe tu respuesta argumentada…">${esc(store('esp32lab_' + id) || '')}</textarea>
+    <details><summary>Criterios de una respuesta coherente</summary><ul>${crit.map(c => `<li>${esc(c)}</li>`).join('')}</ul></details></div>`; }).join('') + '</div>').join('');
+  $$('#qList textarea').forEach(t => t.addEventListener('input', () => store('esp32lab_' + t.id, t.value)));
+}
+$('#qCopy').onclick = () => {
+  let n = 0, out = 'Laboratorio ESP32-WROOM-32 · Respuestas\n\n';
+  QS.forEach(([g, qs]) => { out += '## ' + g + '\n'; qs.forEach(([, q]) => { n++; out += `P${n}. ${q}\nR: ${($('#q' + n) || {}).value || '(sin responder)'}\n\n`; }); });
+  const done = () => { $('#qMsg').textContent = 'Respuestas copiadas al portapapeles.'; };
+  try { navigator.clipboard.writeText(out).then(done, () => { $('#qMsg').textContent = 'No se pudo copiar automáticamente: selecciona tus respuestas manualmente.'; }); }
+  catch (e) { $('#qMsg').textContent = 'No se pudo copiar automáticamente.'; }
+};
+qBuild();
+
+/* ============ arranque ============ */
+drawHeader();
+show(location.hash.slice(1) || 'pines');
+requestAnimationFrame(frame);
+</script>
+
+</body></html>
