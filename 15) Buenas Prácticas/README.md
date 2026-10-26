@@ -4,7 +4,7 @@ Simulador interactivo de las buenas prácticas finales de asyncio en MicroPython
 
 ## ▶ Abrir el simulador
 
-### [👉 Haz clic aquí para abrir el simulador](https://dialejobv.github.io/U_Militar/15)%20Buenas%20Pr%C3%A1cticas/)
+### [👉 Haz clic aquí para abrir el simulador](https://dialejobv.github.io/U_Militar/15%29%20Buenas%20Pr%C3%A1cticas/)
 
 Se abre en el navegador; no necesitas instalar nada. Funciona en computador y en celular.
 
