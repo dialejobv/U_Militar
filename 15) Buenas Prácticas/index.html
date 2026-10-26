@@ -1,0 +1,1708 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Buenas prácticas asyncio ESP32</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: misma identidad del Laboratorio ESP32 (banda PCB + pestañas) · simulador de ciclo de eventos con escena, línea de tiempo y código generado */
+:root{
+  --bg:#eef2ef; --panel:#fbfcfb; --ink:#14201b; --muted:#56655e; --line:#cfd8d2; --soft:#e3eae5;
+  --hdr-bg:#0e5a49; --hdr-ink:#e8f5ef; --hdr-muted:#a9d3c4;
+  --pcb:#0e6a55; --copper:#a5611c; --gold:#b98a24;
+  --ok:#2b8549; --warn:#a8700a; --bad:#bb3826; --info:#2463a6; --vio:#7449aa;
+  --f-disp:"Saira Semi Condensed","Arial Narrow",sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1412; --panel:#131c19; --ink:#e2eae6; --muted:#98a7a0; --line:#2a3832; --soft:#1a2521;
+  --hdr-bg:#10342b; --hdr-ink:#dcf0e8; --hdr-muted:#86b3a3;
+  --pcb:#3cb995; --copper:#e39a52; --gold:#e3bb5f;
+  --ok:#4cc072; --warn:#e7ab3c; --bad:#f06c54; --info:#62a7ee; --vio:#b18ae8; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0d1412; --panel:#131c19; --ink:#e2eae6; --muted:#98a7a0; --line:#2a3832; --soft:#1a2521;
+  --hdr-bg:#10342b; --hdr-ink:#dcf0e8; --hdr-muted:#86b3a3;
+  --pcb:#3cb995; --copper:#e39a52; --gold:#e3bb5f;
+  --ok:#4cc072; --warn:#e7ab3c; --bad:#f06c54; --info:#62a7ee; --vio:#b18ae8; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--hdr-bg)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3,h4{font-family:var(--f-disp);line-height:1.15;text-wrap:balance;margin:0}
+h2{font-size:clamp(1.6rem,3vw,2.15rem);font-weight:700}
+h3{font-size:1.2rem;font-weight:600}
+h4{font-size:1rem;font-weight:600;letter-spacing:.02em}
+p{margin:0}
+code,pre,.mono{font-family:var(--f-mono)}
+a{color:var(--info)}
+
+/* cabecera */
+.top{background:var(--hdr-bg);color:var(--hdr-ink);position:relative;overflow:hidden}
+.top .wrap{padding-block:26px 22px;display:grid;gap:14px;position:relative}
+.top canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.35;pointer-events:none}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--hdr-muted)}
+.top h1{font-size:clamp(2.2rem,6vw,3.9rem);font-weight:700;letter-spacing:.01em}
+.top h1 span{color:var(--gold)}
+.top p.lead{max-width:68ch;color:var(--hdr-ink);opacity:.92}
+.specstrip{display:flex;flex-wrap:wrap;gap:6px}
+.specstrip span{font-family:var(--f-mono);font-size:.74rem;border:1px solid color-mix(in srgb,var(--hdr-ink) 30%,transparent);padding:3px 8px;border-radius:3px}
+
+/* pestañas */
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--panel);border-bottom:1px solid var(--line)}
+.tabs .wrap{display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin}
+.tab{flex:0 0 auto;border:0;background:none;color:var(--muted);font:600 .9rem var(--f-disp);padding:12px 12px 10px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab b{font-family:var(--f-mono);font-weight:400;font-size:.72rem;margin-right:6px;color:var(--copper)}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--copper)}
+.tab:focus-visible,.btn:focus-visible,.chip:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+
+/* secciones */
+main{padding-block:26px 60px}
+section.mod{display:grid;gap:22px}
+.modhead{display:grid;gap:8px;max-width:80ch}
+.modhead .eyebrow{color:var(--copper)}
+.modhead p{color:var(--muted)}
+.grid{display:grid;gap:16px;align-content:start;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr))}
+.grid.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))}
+.grid.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:12px;align-content:start;min-width:0}
+.card.flat{background:transparent;border-style:dashed}
+.card > p,.card li{color:var(--ink)}
+.note{font-size:.88rem;color:var(--muted)}
+.lab{border-top:3px solid var(--pcb)}
+.lab-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tag{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--pcb)}
+ul.clean{margin:0;padding-left:18px;display:grid;gap:4px}
+
+/* controles */
+.ctrls{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.ctl{display:grid;gap:3px;font-size:.85rem;min-width:0}
+.ctl label,.ctl .lbl{color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.ctl output,.val{font-family:var(--f-mono);color:var(--ink);font-size:.8rem}
+input[type=range]{width:100%;accent-color:var(--pcb)}
+select,input[type=text],input[type=number],textarea{font:inherit;font-size:.9rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;width:100%}
+textarea{resize:vertical;min-height:70px}
+.check{display:flex;align-items:center;gap:6px;font-size:.86rem;color:var(--ink)}
+.ctl label.check{justify-content:flex-start;color:var(--ink)}
+.check input{accent-color:var(--pcb)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:600 .85rem var(--f-body);border:1px solid var(--pcb);background:var(--pcb);color:var(--panel);padding:7px 12px;border-radius:4px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--pcb)}
+.btn.warn{background:transparent;border-color:var(--bad);color:var(--bad)}
+.btn.sm{padding:3px 8px;font-size:.76rem}
+.btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.chip{font:600 .76rem var(--f-mono);border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:4px 9px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--soft)}
+.pill{font:600 .7rem var(--f-mono);padding:2px 7px;border-radius:3px;background:var(--soft);color:var(--ink);white-space:nowrap}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.info{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+
+canvas.cv{width:100%;display:block;background:var(--soft);border-radius:4px;border:1px solid var(--line)}
+.readout{font-family:var(--f-mono);font-size:.8rem;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;display:grid;gap:3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.readout b{color:var(--copper);font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+.kv span:nth-child(odd){color:var(--muted)}
+
+pre.code{margin:0;background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:12px;font-size:.76rem;line-height:1.5;overflow-x:auto;max-height:420px;white-space:pre}
+pre.code .c{color:var(--muted)}
+pre.code .k{color:var(--vio)}
+pre.code .s{color:var(--ok)}
+details.code{border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+details.code summary{cursor:pointer;padding:8px 12px;font:600 .85rem var(--f-disp);color:var(--pcb)}
+details.code pre.code{border:0;border-top:1px solid var(--line);border-radius:0}
+
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-disp);font-weight:600;background:var(--soft);white-space:nowrap}
+td.mono,td code{font-size:.78rem}
+tr:last-child td{border-bottom:0}
+
+.pinwrap > *,.grid > *,.card > *,section.mod > *{min-width:0}
+[hidden]{display:none!important}
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+/* listas de tareas */
+.tasklist{display:grid;gap:6px}
+.trow{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:.84rem;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+.trow .sw{width:12px;height:12px;border-radius:2px}
+.trow .nm{font-family:var(--f-mono);font-size:.78rem;overflow-wrap:anywhere}
+.serial{font-family:var(--f-mono);font-size:.74rem;background:#0b1210;color:#9fe3b9;border-radius:4px;padding:10px;height:210px;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid var(--line)}
+.serial .er{color:#ff8e7a}.serial .sy{color:#f2c86b}
+
+/* esp mock */
+.espmock{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.espmock > div{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px;text-align:center;font-size:.78rem;display:grid;gap:4px;justify-items:center}
+.led{width:26px;height:26px;border-radius:50%;background:var(--soft);border:2px solid var(--line);transition:background .2s,box-shadow .2s}
+
+/* flujo */
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.82rem}
+.flow span.st{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 9px;font-family:var(--f-mono);font-size:.74rem}
+.flow span.ar{color:var(--copper);font-weight:700}
+
+/* preguntas */
+.qgroup{display:grid;gap:10px}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:grid;gap:8px}
+.q .qh{display:flex;gap:10px;align-items:baseline}
+.q .qn{font:700 1rem var(--f-mono);color:var(--copper)}
+.q details summary{cursor:pointer;font-size:.84rem;color:var(--pcb);font-weight:600}
+.q details ul{margin:6px 0 0;padding-left:18px;font-size:.86rem;color:var(--muted)}
+.q .lvl{font:600 .66rem var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding-block:20px;color:var(--muted);font-size:.84rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- simulador de buenas prácticas ---- */
+.simgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);align-items:start}
+@media (max-width:900px){.simgrid{grid-template-columns:1fr}}
+.scene{position:relative}
+.scene canvas{aspect-ratio:16/10;height:auto}
+.overlay{position:absolute;inset:auto 10px 10px 10px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
+.prac{display:grid;gap:8px}
+.sw{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 10px;cursor:pointer}
+.sw input{appearance:none;width:38px;height:22px;border-radius:11px;background:var(--bad);position:relative;cursor:pointer;margin:2px 0 0;flex:none;transition:background .2s}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--panel);transition:left .2s}
+.sw input:checked{background:var(--ok)}
+.sw input:checked::after{left:19px}
+.sw input:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+.sw b{display:block;font:600 .9rem var(--f-disp)}
+.sw small{display:block;color:var(--muted);font-size:.78rem;font-family:var(--f-mono);overflow-wrap:anywhere}
+.health{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg)}
+.health .dot{width:14px;height:14px;border-radius:50%;flex:none}
+.health b{font:700 1rem var(--f-disp)}
+.health span{font-size:.82rem;color:var(--muted)}
+.ttable td,.ttable th{padding:6px 8px;font-size:.8rem}
+.ttable td{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.ttable td:first-child{font-family:var(--f-body)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.ctabs{display:flex;gap:4px;flex-wrap:wrap}
+.ctab{font:600 .8rem var(--f-mono);border:1px solid var(--line);background:var(--bg);color:var(--muted);padding:5px 10px;border-radius:4px 4px 0 0;cursor:pointer}
+.ctab[aria-selected="true"]{background:var(--soft);color:var(--ink);border-bottom-color:var(--soft)}
+pre.code .bad{color:var(--bad);font-weight:600}
+pre.code .good{color:var(--ok);font-weight:600}
+pre.code mark{background:color-mix(in srgb,var(--warn) 22%,transparent);color:inherit;border-radius:2px}
+.vs{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.vs .lbl{font:600 .72rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase}
+.vs .lbl.b{color:var(--bad)} .vs .lbl.g{color:var(--ok)}
+.tree{font-family:var(--f-mono);font-size:.82rem;display:grid;gap:1px}
+.tree button{all:unset;cursor:pointer;padding:3px 6px;border-radius:3px;white-space:pre;color:var(--ink)}
+.tree button:hover{background:var(--soft)}
+.tree button[aria-pressed="true"]{background:color-mix(in srgb,var(--pcb) 16%,transparent);color:var(--pcb);font-weight:600}
+.tree button:focus-visible{outline:2px solid var(--info)}
+.tree .dir{color:var(--copper);padding:3px 6px;white-space:pre}
+.checklist{display:grid;gap:6px}
+.checklist label{display:flex;gap:8px;align-items:flex-start;font-size:.9rem;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 10px;cursor:pointer}
+.checklist input{accent-color:var(--pcb);margin-top:3px}
+.reallife{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:.88rem}
+.reallife dt{font-weight:600;color:var(--pcb)}
+.reallife dd{margin:0}
+</style>
+
+<header class="top">
+  <canvas id="hdrCv" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="eyebrow">Laboratorio ESP32-WROOM-32 · Profundización en tareas · Cierre</span>
+    <h1>Buenas prácticas <span>·</span> asyncio</h1>
+    <p class="lead">Cinco hábitos que separan un prototipo de un sistema embebido confiable, probados en simulaciones de robótica actual: un brazo pick-and-place, un edificio con domótica e inmótica, una estación meteorológica, un robot móvil AGV y un invernadero automatizado.</p>
+    <div class="specstrip">
+      <span>asyncio.gather()</span><span>sin time.sleep()</span><span>tareas cortas y cooperativas</span><span>try/except en corrutinas</span><span>estructura de proyecto real</span>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Secciones">
+  <div class="wrap" role="tablist">
+    <button class="tab" role="tab" data-tab="simulador"><b>01</b>Simulador de robótica</button>
+    <button class="tab" role="tab" data-tab="practicas"><b>02</b>Las cinco prácticas</button>
+    <button class="tab" role="tab" data-tab="estructura"><b>03</b>Estructura de un proyecto real</button>
+    <button class="tab" role="tab" data-tab="evaluacion"><b>04</b>Verificación y preguntas</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ================= SIMULADOR ================= -->
+<section class="mod" id="simulador" data-panel>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 01 · Simulación</span>
+    <h2>Un ESP32, un ciclo de eventos, cinco sistemas reales</h2>
+    <p>Elige un sistema y apaga o enciende cada buena práctica. Cada cambio "recarga el firmware": el escenario se reinicia y el código de abajo se reescribe con tus decisiones. Observa qué se rompe primero.</p>
+  </div>
+
+  <div class="row" id="scenChips" role="group" aria-label="Sistema a simular"></div>
+
+  <div class="simgrid">
+    <div class="card scene">
+      <div class="lab-title"><h3 id="scenTitle">Brazo robótico</h3><span class="tag" id="scenTag">pick and place</span></div>
+      <canvas class="cv" id="sceneCv"></canvas>
+      <div class="readout" id="scenMetrics"></div>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr">
+      <div class="card">
+        <h4>Buenas prácticas en el firmware</h4>
+        <div class="prac">
+          <label class="sw" for="pGather"><input type="checkbox" id="pGather" checked><span><b>Organizar con asyncio.gather()</b><small id="pGatherS"></small></span></label>
+          <label class="sw" for="pAsync"><input type="checkbox" id="pAsync" checked><span><b>Esperar con await asyncio.sleep()</b><small id="pAsyncS"></small></span></label>
+          <label class="sw" for="pShort"><input type="checkbox" id="pShort" checked><span><b>Tareas cortas y cooperativas</b><small id="pShortS"></small></span></label>
+          <label class="sw" for="pTry"><input type="checkbox" id="pTry" checked><span><b>try/except dentro de cada corrutina</b><small id="pTryS"></small></span></label>
+        </div>
+        <div class="row"><button class="btn sm" id="allGood">Aplicar las cuatro</button><button class="btn sm warn" id="allBad">Romper las cuatro</button></div>
+      </div>
+      <div class="card">
+        <h4>Acciones sobre el sistema</h4>
+        <div class="row" id="scenActions"></div>
+        <div class="row">
+          <button class="btn sm warn" id="faultBtn">Inyectar fallo de sensor</button>
+          <label class="check"><input type="checkbox" id="faultAuto"> Fallos intermitentes</label>
+        </div>
+        <div class="row"><button class="btn sm ghost" id="resetBtn">Reiniciar ESP32 (machine.reset)</button><button class="btn sm ghost" id="pauseBtn">Pausar</button></div>
+        <div class="ctl"><label for="speed">Velocidad de simulación <output id="speedo"></output></label><input type="range" id="speed" min="0.25" max="4" step="0.25" value="1"></div>
+      </div>
+      <div class="health" id="health"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lab-title"><h3>Línea de tiempo del ciclo de eventos</h3><span class="tag">un núcleo · un hilo · últimos 4 s</span></div>
+    <canvas class="cv" id="tlCv" style="height:230px"></canvas>
+    <div class="legend note">
+      <span><i class="swatch" style="background:var(--info)"></i>ejecutando (color de cada tarea)</span>
+      <span><i class="swatch" style="background:var(--bad)"></i>time.sleep() bloqueando el ciclo</span>
+      <span><i class="swatch" style="background:var(--info);opacity:.5"></i>lista, esperando turno</span>
+      <span><i class="swatch" style="background:var(--muted);opacity:.35"></i>nunca iniciada o detenida</span>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4>Tareas del firmware</h4>
+      <div class="tblwrap"><table class="ttable" id="taskTbl"></table></div>
+    </div>
+    <div class="card">
+      <h4>Monitor serie (UART0)</h4>
+      <div class="serial" id="serial" style="height:260px"></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="lab-title"><h3>Código del firmware con tus ajustes</h3><span class="tag">se reescribe en vivo</span></div>
+      <div class="ctabs" role="tablist"><button class="ctab" data-l="py" aria-selected="true">MicroPython · main.py</button><button class="ctab" data-l="cpp" aria-selected="false">C++ · Arduino + FreeRTOS</button></div>
+      <pre class="code" id="codeOut" style="max-height:520px"></pre>
+      <div class="row"><button class="btn sm ghost" id="copyCode">Copiar código</button><span class="note" id="copyMsg"></span></div>
+    </div>
+    <div class="card" id="scenReal"></div>
+  </div>
+</section>
+
+<!-- ================= PRÁCTICAS ================= -->
+<section class="mod" id="practicas" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 02 · Referencia</span>
+    <h2>Las cinco prácticas, lado a lado</h2>
+    <p>Cada práctica con su error típico, su corrección en MicroPython y su equivalente en C++ para ESP32. Usa esta sección como guía de revisión de código.</p>
+  </div>
+  <div id="pracList" class="grid" style="grid-template-columns:1fr"></div>
+</section>
+
+<!-- ================= ESTRUCTURA ================= -->
+<section class="mod" id="estructura" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 03 · Arquitectura</span>
+    <h2>Estructura recomendada de un proyecto real</h2>
+    <p>Un proyecto que crece necesita separar configuración, controladores de hardware, tareas y utilidades. Toca un archivo para ver qué contiene y por qué está ahí.</p>
+  </div>
+  <div class="row" id="treeLang" role="group" aria-label="Lenguaje">
+    <button class="chip" data-t="py" aria-pressed="true">MicroPython</button>
+    <button class="chip" data-t="cpp" aria-pressed="false">C++ con PlatformIO</button>
+  </div>
+  <div class="simgrid">
+    <div class="card"><div class="lab-title"><h3 id="fileName">main.py</h3><span class="tag" id="fileRole"></span></div><p class="note" id="fileDesc"></p><pre class="code" id="fileCode" style="max-height:540px"></pre></div>
+    <div class="card"><h4 id="treeTitle">estacion_meteo/</h4><div class="tree" id="tree"></div></div>
+  </div>
+  <div class="card">
+    <h3>Capas del firmware</h3>
+    <canvas class="cv" id="layerCv" style="height:260px"></canvas>
+    <p class="note">Las dependencias solo bajan: una tarea usa controladores, un controlador usa la HAL de MicroPython o ESP-IDF, y nadie de abajo importa a alguien de arriba. Así puedes cambiar un sensor sin tocar la lógica.</p>
+  </div>
+</section>
+
+<!-- ================= EVALUACIÓN ================= -->
+<section class="mod" id="evaluacion" data-panel hidden>
+  <div class="modhead">
+    <span class="eyebrow">Módulo 04 · Evaluación</span>
+    <h2>Lista de verificación y preguntas</h2>
+    <p>Marca la lista antes de entregar tu proyecto. Luego responde las preguntas con argumentos; tus respuestas se guardan en este navegador.</p>
+  </div>
+  <div class="card">
+    <div class="lab-title"><h3>Antes de cargar el firmware</h3><span class="tag" id="chkCount"></span></div>
+    <div class="checklist" id="checklist"></div>
+  </div>
+  <div class="row"><button class="btn" id="qCopy">Copiar todas mis respuestas</button><span class="note" id="qMsg"></span></div>
+  <div id="qList" class="grid" style="grid-template-columns:1fr"></div>
+</section>
+
+</main>
+<footer><div class="wrap">Laboratorio ESP32-WROOM-32 · Buenas prácticas con asyncio. Las simulaciones reproducen el comportamiento del ciclo de eventos de MicroPython con tiempos representativos; no son mediciones de un equipo concreto.</div></footer>
+<script>
+/* ============ utilidades ============ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const C = {};
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  ['bg','panel','ink','muted','line','soft','pcb','copper','gold','ok','warn','bad','info','vio','hdr-ink'].forEach(k => C[k] = cs.getPropertyValue('--' + k).trim());
+}
+readColors();
+function rgba(hex, a) {
+  if (!hex || hex[0] !== '#') return hex;
+  let h = hex.slice(1); if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+}
+function fit(cv) {
+  const r = cv.getBoundingClientRect(); const d = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(10, Math.round(r.width)), h = Math.max(10, Math.round(r.height));
+  if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); }
+  const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return { x, w, h };
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = (a, b) => a + Math.random() * (b - a);
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+function txt(x, t, px, py, align = 'left', col = C.muted, size = 10, weight = '') { x.fillStyle = col; x.font = `${weight} ${size}px "JetBrains Mono", monospace`; x.textAlign = align; x.fillText(t, px, py); }
+const fmtS = ms => (ms / 1000).toFixed(1) + ' s';
+
+/* ============ pestañas ============ */
+const onShow = {}, anim = {};
+let ACTIVE = 'simulador';
+function show(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.hasAttribute('data-panel')) id = 'simulador';
+  ACTIVE = id;
+  $$('[data-panel]').forEach(p => p.hidden = p.id !== id);
+  $$('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === id ? 'true' : 'false'));
+  try { history.replaceState(null, '', '#' + id); } catch (e) {}
+  requestAnimationFrame(() => onShow[id] && onShow[id]());
+}
+$$('.tab').forEach(t => t.addEventListener('click', () => { show(t.dataset.tab); const nav = $('.tabs'); window.scrollTo({ top: Math.max(0, $('main').offsetTop - nav.offsetHeight - 4), behavior: 'smooth' }); }));
+function themeChanged() { readColors(); drawHeader(); onShow[ACTIVE] && onShow[ACTIVE](); }
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeChanged); } catch (e) {}
+new MutationObserver(themeChanged).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+window.addEventListener('resize', () => { drawHeader(); onShow[ACTIVE] && onShow[ACTIVE](); });
+
+function drawHeader() {
+  const cv = $('#hdrCv'); const { x, w, h } = fit(cv);
+  x.clearRect(0, 0, w, h);
+  let seed = 11; const r = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  x.strokeStyle = rgba(C['hdr-ink'], 0.28); x.lineWidth = 1.4; x.fillStyle = rgba(C['hdr-ink'], 0.32);
+  for (let i = 0; i < 26; i++) {
+    let px = w * 0.45 + r() * w * 0.6, py = r() * h;
+    x.beginPath(); x.moveTo(px, py);
+    for (let k = 0; k < 4; k++) {
+      const dir = Math.floor(r() * 4), L = 20 + r() * 70;
+      if (dir === 0) px += L; else if (dir === 1) py += L * 0.6; else if (dir === 2) { px += L * 0.7; py -= L * 0.7; } else { px += L * 0.7; py += L * 0.7; }
+      x.lineTo(px, py);
+    }
+    x.stroke(); x.beginPath(); x.arc(px, py, 3, 0, 7); x.fill();
+  }
+}
+
+/* ============ motor del ciclo de eventos ============ */
+const P = { gather: true, async: true, short: true, tryx: true };
+const SLICE = 10, WIN = 4000;
+const TCOL = ['info', 'vio', 'gold', 'ok', 'pcb', 'copper'];
+const ENG = { t: 0, tasks: [], q: [], cur: null, halted: false, paused: false, log: [], S: null, sc: null, faultArmed: false };
+let SCEN = [], scenIdx = 0;
+
+function slog(c, s) {
+  const m = Math.floor(ENG.t / 60000), sec = (ENG.t / 1000 % 60).toFixed(2).padStart(5, '0');
+  ENG.log.push([c, `${m}:${sec}  ${s}`]); if (ENG.log.length > 160) ENG.log.splice(0, ENG.log.length - 160);
+  ENG.logDirty = true;
+}
+function setSt(k, st) {
+  if (k.segSt === st) return;
+  if (k.segSt !== null && ENG.t > k.segT) k.segs.push([k.segT, ENG.t, k.segSt]);
+  k.segSt = st; k.segT = ENG.t;
+  if (k.segs.length > 600) k.segs.splice(0, 200);
+}
+function engReset(silent) {
+  const sc = SCEN[scenIdx]; ENG.sc = sc;
+  ENG.t = 0; ENG.q = []; ENG.cur = null; ENG.halted = false; ENG.log = []; ENG.S = {}; ENG.nextAuto = 4000;
+  sc.init(ENG.S);
+  ENG.tasks = sc.tasks.map((d, i) => ({ d, i, col: TCOL[i % TCOL.length], st: 'wait', next: 0, rem: 0, rel: 0, phase: 'work', runs: 0, maxLat: 0, lastLat: 0, lats: [], miss: 0, errs: 0, fault: false, segs: [], segSt: null, segT: 0, sliceRem: SLICE, newCycle: true }));
+  slog('sy', 'rst:0x1 (POWERON_RESET) · MicroPython v1.24 en ESP32');
+  slog('sy', `main.py · ${sc.name} · ${ENG.tasks.length} corrutinas`);
+  ENG.tasks.forEach((k, i) => {
+    if (P.gather || i === 0) { setSt(k, 'ready'); k.rel = 0; ENG.q.push(k); }
+    else setSt(k, 'never');
+  });
+  if (P.gather) slog('', `await asyncio.gather(${ENG.tasks.map(k => k.d.fn + '()').join(', ')})`);
+  else {
+    slog('er', `await ${ENG.tasks[0].d.fn}()  → bucle infinito: nunca retorna`);
+    slog('er', `${ENG.tasks.length - 1} tareas esperan una línea que nunca se alcanza`);
+  }
+  if (!P.async) { const k = ENG.tasks.find(k => k.d.culprit); if (k) slog('er', `${k.d.fn}() usa time.sleep(${k.d.block / 1000}) dentro de la corrutina`); }
+  if (!P.short) { const k = ENG.tasks.find(k => k.d.heavy); if (k) slog('er', `${k.d.fn}() calcula ${k.d.cost} ms seguidos sin ceder`); }
+}
+function yieldTask(k, delay) {
+  ENG.cur = null; k.phase = 'work';
+  if (delay <= 0) { setSt(k, 'ready'); k.rel = ENG.t; k.newCycle = true; ENG.q.push(k); }
+  else { k.next = ENG.t + delay; setSt(k, 'wait'); }
+}
+function halt(k) {
+  const d = k.d;
+  ENG.halted = true; ENG.cur = null; ENG.q = [];
+  slog('er', 'Traceback (most recent call last):');
+  slog('er', '  File "main.py", line 112, in <module>');
+  slog('er', '  File "asyncio/core.py", line 1, in run_until_complete');
+  slog('er', `  File "tareas.py", line ${40 + k.i * 9}, in ${d.fn}`);
+  slog('er', d.exc);
+  slog('sy', 'La excepción subió por gather(), main() terminó y asyncio.run() se detuvo: ninguna corrutina vuelve a ejecutarse.');
+  slog('sy', 'Las salidas quedan congeladas en su último estado.');
+  ENG.tasks.forEach(t => setSt(t, 'dead'));
+  ENG.S.halted = true;
+}
+function finishWork(k) {
+  const d = k.d, S = ENG.S;
+  let fault = false;
+  if (d.faultable && (k.fault || (ENG.faultAuto && Math.random() < 0.06))) { fault = true; k.fault = false; }
+  if (fault) {
+    if (P.tryx) {
+      k.errs++; slog('er', `[${d.fn}] ${d.exc.split(':')[0]} capturado → ${d.onErrTxt}`);
+      d.onErr && d.onErr(S, ENG.t);
+    } else { halt(k); return; }
+  } else d.act(S, ENG.t, k);
+  k.runs++;
+  if (d.culprit && !P.async) { k.phase = 'block'; k.rem = d.block; setSt(k, 'block'); return; }
+  yieldTask(k, d.period);
+}
+function engStep() {
+  const t = ENG.t;
+  for (const k of ENG.tasks) if (k.segSt === 'wait' && k.next <= t) { setSt(k, 'ready'); k.rel = k.next; k.newCycle = true; ENG.q.push(k); }
+  if (ENG.faultAuto && t >= ENG.nextAuto) { ENG.nextAuto = t + rnd(2500, 6000); const f = ENG.tasks.filter(k => k.d.faultable); if (f.length) f[Math.floor(Math.random() * f.length)].fault = true; }
+  if (!ENG.halted) {
+    let budget = 1, guard = 0;
+    while (budget > 1e-6 && guard++ < 50) {
+      if (!ENG.cur) {
+        const k = ENG.q.shift(); if (!k) break;
+        ENG.cur = k;
+        if (k.newCycle) {
+          const lat = t - k.rel; k.lastLat = lat; k.maxLat = Math.max(k.maxLat, lat); k.lats.push([t, lat]);
+          if (k.lats.length > 80) k.lats.shift();
+          if (lat > k.d.tol) { k.miss++; if (k.miss <= 3 || k.miss % 20 === 0) slog('er', `[${k.d.fn}] empezó ${Math.round(lat)} ms tarde (límite ${k.d.tol} ms)`); }
+          k.newCycle = false; k.rem = k.d.cost; k.sliceRem = SLICE;
+        }
+        setSt(k, 'run');
+      }
+      const k = ENG.cur;
+      if (k.phase === 'block') {
+        const use = Math.min(budget, k.rem); k.rem -= use; budget -= use;
+        if (k.rem <= 1e-6) yieldTask(k, 0);
+        continue;
+      }
+      const chunked = k.d.heavy && P.short;
+      const use = Math.min(budget, k.rem, chunked ? k.sliceRem : Infinity);
+      k.rem -= use; budget -= use; if (chunked) k.sliceRem -= use;
+      if (k.rem <= 1e-6) finishWork(k);
+      else if (chunked && k.sliceRem <= 1e-6) { k.sliceRem = SLICE; ENG.cur = null; setSt(k, 'ready'); ENG.q.push(k); }
+    }
+  }
+  ENG.sc.update(ENG.S, 1, ENG.t);
+  ENG.t++;
+}
+
+/* ============ vistas del simulador ============ */
+function drawTimeline() {
+  const { x, w, h } = fit($('#tlCv')); x.clearRect(0, 0, w, h);
+  const L = Math.min(190, w * .34), R = 8, top = 6, bot = 20, n = ENG.tasks.length, lh = (h - top - bot) / Math.max(1, n);
+  const t0 = ENG.t - WIN, X = t => L + (t - t0) / WIN * (w - L - R);
+  for (let s = Math.ceil(t0 / 1000) * 1000; s <= ENG.t; s += 1000) { if (s < 0) continue; x.strokeStyle = C.line; x.lineWidth = 1; x.beginPath(); x.moveTo(X(s), top); x.lineTo(X(s), h - bot); x.stroke(); txt(x, (s / 1000).toFixed(0) + ' s', X(s), h - 6, 'center'); }
+  ENG.tasks.forEach((k, i) => {
+    const y = top + i * lh;
+    if (i % 2 === 0) { x.fillStyle = rgba(C.line, .22); x.fillRect(0, y, w, lh); }
+    x.fillStyle = C[k.col]; x.fillRect(6, y + lh / 2 - 5, 10, 10);
+    txt(x, k.d.fn + '()', 22, y + lh / 2 + 4, 'left', C.ink, Math.min(11, lh * .5));
+    const segs = k.segs.concat([[k.segT, ENG.t, k.segSt]]);
+    for (const [a, b, s] of segs) {
+      if (b < t0) continue; const xa = Math.max(L, X(a)), xb = X(b); if (xb <= xa && s !== 'run') continue;
+      if (s === 'run') { x.fillStyle = C[k.col]; x.fillRect(xa, y + 3, Math.max(1.5, xb - xa), lh - 6); }
+      else if (s === 'block') { x.fillStyle = C.bad; x.fillRect(xa, y + 3, xb - xa, lh - 6); }
+      else if (s === 'ready') { x.fillStyle = rgba(C.info, .45); x.fillRect(xa, y + lh * .3, xb - xa, lh * .4); }
+      else if (s === 'never' || s === 'dead') { x.fillStyle = rgba(C.muted, .3); x.fillRect(xa, y + lh * .4, xb - xa, lh * .2); }
+    }
+  });
+  if (ENG.halted) { x.fillStyle = rgba(C.bad, .9); x.fillRect(L + 10, h / 2 - 16, w - L - 30, 30); txt(x, 'Excepción no capturada: ciclo de eventos detenido', L + (w - L - 10) / 2, h / 2 + 4, 'center', '#fff', 12, 600); }
+}
+function taskTable() {
+  const st = { run: ['ejecutando', 'warn'], ready: ['lista', 'info'], wait: ['await sleep', ''], block: ['time.sleep()', 'bad'], never: ['nunca inició', 'bad'], dead: ['cancelada', 'bad'] };
+  $('#taskTbl').innerHTML = `<thead><tr><th>Corrutina</th><th>Periodo</th><th>Ejec.</th><th>Lat. máx</th><th>Tarde</th><th>Errores</th><th>Estado</th></tr></thead><tbody>` +
+    ENG.tasks.map(k => { const s = st[k.segSt] || [k.segSt, '']; return `<tr><td><span class="swatch" style="background:${C[k.col]}"></span>${k.d.fn}${k.d.crit ? ' <span class="pill warn" title="Tarea crítica">crítica</span>' : ''}</td><td>${k.d.period} ms</td><td>${k.runs}</td><td>${Math.round(k.maxLat)} ms</td><td>${k.miss ? `<span class="pill bad">${k.miss}</span>` : '0'}</td><td>${k.errs ? `<span class="pill warn">${k.errs}</span>` : '0'}</td><td><span class="pill ${s[1]}">${s[0]}</span></td></tr>`; }).join('') + '</tbody>';
+}
+function serialUi() {
+  if (!ENG.logDirty) return; ENG.logDirty = false;
+  const el = $('#serial'); const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  el.innerHTML = ENG.log.slice(-120).map(([c, s]) => `<div class="${c}">${esc(s)}</div>`).join('');
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+function health() {
+  let col = C.ok, h = 'Sistema sano', d = 'Todas las tareas críticas responden dentro de su límite.';
+  const never = ENG.tasks.filter(k => k.segSt === 'never').length;
+  const recent = k => k.lats.filter(([t]) => t > ENG.t - 3000).reduce((a, [, l]) => Math.max(a, l), 0);
+  const crit = ENG.tasks.filter(k => k.d.crit);
+  const worst = crit.reduce((a, k) => Math.max(a, recent(k) / k.d.tol), 0);
+  if (ENG.halted) { col = C.bad; h = 'Sistema detenido'; d = 'Una excepción sin capturar canceló todas las tareas. Las salidas quedaron en su último estado.'; }
+  else if (never) { col = C.bad; h = `${never} tareas nunca iniciaron`; d = 'Sin gather() el primer await infinito bloquea a las demás.'; }
+  else if (worst > 3) { col = C.bad; h = 'Tiempo real perdido'; d = `Una tarea crítica responde hasta ${worst.toFixed(0)} veces más tarde de lo permitido.`; }
+  else if (worst > 1) { col = C.warn; h = 'Respuesta degradada'; d = 'Alguna tarea crítica supera su límite de latencia.'; }
+  $('#health').innerHTML = `<span class="dot" style="background:${col}"></span><div><b style="color:${col}">${h}</b><br><span>${d}</span></div>`;
+}
+
+/* ============ código generado ============ */
+function L(t, c = '') { return { t, c }; }
+function pyWait(ms) { return ms >= 1000 && ms % 1000 === 0 ? `await asyncio.sleep(${ms / 1000})` : `await asyncio.sleep_ms(${ms})`; }
+function genPy(sc) {
+  const out = [];
+  out.push(L(`# main.py · ${sc.name} · ESP32-WROOM-32 + MicroPython`));
+  out.push(L(P.tryx ? 'import asyncio, machine' : 'import asyncio'));
+  if (!P.async) out.push(L('import time', 'bad'));
+  out.push(L('from config import *'));
+  sc.imports.forEach(s => out.push(L(s)));
+  out.push(L('import log'));
+  out.push(L(''));
+  sc.tasks.forEach(d => {
+    out.push(L(`async def ${d.fn}():`));
+    if (d.doc) out.push(L(`    # ${d.doc}`));
+    out.push(L('    while True:'));
+    const ind = P.tryx ? '            ' : '        ';
+    if (P.tryx) out.push(L('        try:', 'good'));
+    let body = [];
+    if (d.heavy) {
+      body.push(L(ind + d.loop));
+      body.push(L(ind + '    ' + d.inner));
+      if (P.short) body.push(L(ind + `    if i % 5 == 0: await asyncio.sleep_ms(0)  # cede el turno`, 'good'));
+      else body.push(L(ind + `    # ✗ ${d.cost} ms seguidos sin ningún await`, 'bad'));
+      d.py.forEach(s => body.push(L(ind + s)));
+    } else d.py.forEach(s => body.push(L(ind + s)));
+    body.forEach(b => out.push(b));
+    if (P.tryx) {
+      if (d.faultable) {
+        out.push(L(`        except ${d.exc.split(':')[0]} as e:`, 'good'));
+        out.push(L(`            log.error("${d.fn}", e)`, 'good'));
+        d.pyErr.forEach(s => out.push(L('            ' + s, 'good')));
+      } else {
+        out.push(L('        except Exception as e:', 'good'));
+        out.push(L(`            log.error("${d.fn}", e)  # la tarea sigue viva`, 'good'));
+      }
+    } else if (d.faultable) out.push(L(`        # ✗ si ${d.exc.split(':')[0]} ocurre aquí, cae todo el sistema`, 'bad'));
+    if (d.culprit && !P.async) out.push(L(`        time.sleep(${d.block / 1000})  # ✗ congela TODO el ciclo de eventos`, 'bad'));
+    else out.push(L(`        ${pyWait(d.period)}`, d.culprit ? 'good' : ''));
+    out.push(L(''));
+  });
+  out.push(L('async def main():'));
+  out.push(L('    log.info("arranque")'));
+  if (P.gather) {
+    out.push(L('    await asyncio.gather(', 'good'));
+    sc.tasks.forEach((d, i) => out.push(L(`        ${d.fn}(),`, 'good')));
+    out.push(L('    )', 'good'));
+  } else {
+    sc.tasks.forEach((d, i) => out.push(L(`    await ${d.fn}()` + (i === 0 ? '  # ✗ nunca retorna' : '  # ✗ nunca se alcanza'), 'bad')));
+  }
+  out.push(L(''));
+  if (P.tryx) {
+    out.push(L('try:', 'good'));
+    out.push(L('    asyncio.run(main())', 'good'));
+    out.push(L('except Exception as e:', 'good'));
+    out.push(L('    log.fatal(e)            # último recurso: registrar', 'good'));
+    out.push(L('    machine.reset()         # y reiniciar en estado seguro', 'good'));
+  } else out.push(L('asyncio.run(main())'));
+  return out;
+}
+function genCpp(sc) {
+  const out = [];
+  out.push(L(`// ${sc.name} · ESP32 + Arduino core (FreeRTOS)`));
+  out.push(L('// FreeRTOS es expropiativo: los errores equivalentes son la espera activa,'));
+  out.push(L('// los bucles largos sin ceder y no verificar el resultado de cada lectura.'));
+  out.push(L('#include <Arduino.h>'));
+  out.push(L('#include "config.h"'));
+  sc.cppInc.forEach(s => out.push(L(s)));
+  out.push(L(''));
+  sc.tasks.forEach((d, i) => {
+    out.push(L(`void ${d.fn}(void *pv) {`));
+    out.push(L('  TickType_t t0 = xTaskGetTickCount();'));
+    out.push(L('  for (;;) {'));
+    if (d.heavy) {
+      out.push(L('    ' + d.cppLoop));
+      out.push(L('      ' + d.cppInner));
+      if (P.short) out.push(L('      if (i % 5 == 0) vTaskDelay(1);  // cede el núcleo', 'good'));
+      else out.push(L(`      // ✗ ${d.cost} ms sin ceder: dispara el task watchdog`, 'bad'));
+      out.push(L('    }'));
+      d.cpp.forEach(s => out.push(L('    ' + s)));
+    } else if (d.faultable) {
+      if (P.tryx) d.cppGood.forEach(s => out.push(L('    ' + s, 'good')));
+      else d.cppBad.forEach(s => out.push(L('    ' + s, 'bad')));
+    } else d.cpp.forEach(s => out.push(L('    ' + s)));
+    if (d.culprit && !P.async) {
+      out.push(L(`    uint32_t t = millis();`, 'bad'));
+      out.push(L(`    while (millis() - t < ${d.block}) {}  // ✗ espera activa`, 'bad'));
+    } else out.push(L(`    vTaskDelayUntil(&t0, pdMS_TO_TICKS(${d.period}));`, d.culprit ? 'good' : ''));
+    out.push(L('  }'));
+    out.push(L('}'));
+    out.push(L(''));
+  });
+  out.push(L('void setup() {'));
+  out.push(L('  Serial.begin(115200);'));
+  sc.cppSetup.forEach(s => out.push(L('  ' + s)));
+  if (P.gather) {
+    sc.tasks.forEach(d => out.push(L(`  xTaskCreatePinnedToCore(${d.fn}, "${d.fn.slice(0, 15)}", ${d.heavy ? 6144 : 3072}, NULL, ${d.prio}, NULL, ${d.core});`, 'good')));
+  }
+  out.push(L('}'));
+  out.push(L(''));
+  if (P.gather) out.push(L('void loop() { vTaskDelete(NULL); }  // todo vive en tareas'));
+  else {
+    out.push(L('void loop() {', 'bad'));
+    sc.tasks.forEach((d, i) => out.push(L(`  ${d.fn}(NULL);` + (i === 0 ? '  // ✗ nunca retorna' : ''), 'bad')));
+    out.push(L('}', 'bad'));
+  }
+  return out;
+}
+let codeLang = 'py';
+function renderCode() {
+  const lines = codeLang === 'py' ? genPy(ENG.sc) : genCpp(ENG.sc);
+  const cm = codeLang === 'py' ? '#' : '//';
+  $('#codeOut').innerHTML = lines.map(({ t, c }) => {
+    let h = esc(t);
+    const idx = t.indexOf(cm);
+    if (idx >= 0 && !c) h = esc(t.slice(0, idx)) + `<span class="c">${esc(t.slice(idx))}</span>`;
+    return c ? `<span class="${c}">${h}</span>` : h;
+  }).join('\n');
+  ENG.codeText = lines.map(l => l.t).join('\n');
+}
+$$('.ctab').forEach(b => b.onclick = () => { codeLang = b.dataset.l; $$('.ctab').forEach(z => z.setAttribute('aria-selected', z === b ? 'true' : 'false')); renderCode(); });
+$('#copyCode').onclick = () => {
+  const msg = $('#copyMsg');
+  try { navigator.clipboard.writeText(ENG.codeText).then(() => msg.textContent = 'Código copiado.', () => msg.textContent = 'Selecciona el código y cópialo manualmente.'); }
+  catch (e) { msg.textContent = 'Selecciona el código y cópialo manualmente.'; }
+};
+
+/* ============ controles ============ */
+const PRAC = [
+  ['pGather', 'gather', 'await asyncio.gather(t1(), t2(), …)', 'await t1()  # las demás nunca empiezan'],
+  ['pAsync', 'async', 'await asyncio.sleep(1)', 'time.sleep(1) en la tarea de telemetría'],
+  ['pShort', 'short', 'trocear con await asyncio.sleep_ms(0)', 'cálculo largo sin ningún await'],
+  ['pTry', 'tryx', 'try/except y estado seguro', 'una excepción tumba todo el sistema']
+];
+function pracUi() { PRAC.forEach(([id, k, g, b]) => { $('#' + id).checked = P[k]; $('#' + id + 'S').textContent = P[k] ? g : b; }); }
+PRAC.forEach(([id, k]) => $('#' + id).addEventListener('change', e => { P[k] = e.target.checked; pracUi(); restart(); }));
+$('#allGood').onclick = () => { Object.keys(P).forEach(k => P[k] = true); pracUi(); restart(); };
+$('#allBad').onclick = () => { Object.keys(P).forEach(k => P[k] = false); pracUi(); restart(); };
+$('#faultBtn').onclick = () => { const f = ENG.tasks.filter(k => k.d.faultable); if (f.length) { f[0].fault = true; slog('sy', `>>> fallo inyectado en ${f[0].d.fn}() (${f[0].d.exc.split(':')[0]})`); } };
+$('#faultAuto').onchange = e => { ENG.faultAuto = e.target.checked; ENG.nextAuto = ENG.t + 1500; };
+$('#resetBtn').onclick = () => restart();
+$('#pauseBtn').onclick = () => { ENG.paused = !ENG.paused; $('#pauseBtn').textContent = ENG.paused ? 'Continuar' : 'Pausar'; };
+$('#speed').oninput = () => $('#speedo').textContent = (+$('#speed').value).toFixed(2).replace(/\.?0+$/, '') + '×';
+
+function buildScenChips() {
+  $('#scenChips').innerHTML = SCEN.map((s, i) => `<button class="chip" data-i="${i}" aria-pressed="${i === scenIdx}"><i style="background:${C[s.col]}"></i>${s.name}</button>`).join('');
+  $$('#scenChips .chip').forEach(b => b.onclick = () => { scenIdx = +b.dataset.i; buildScenChips(); restart(); });
+}
+function restart() {
+  engReset(); const sc = ENG.sc;
+  $('#scenTitle').textContent = sc.name; $('#scenTag').textContent = sc.tag;
+  $('#scenActions').innerHTML = sc.actions.map((a, i) => `<button class="btn sm ${a.warn ? 'warn' : 'ghost'}" data-a="${i}">${a.label}</button>`).join('');
+  $$('#scenActions button').forEach(b => b.onclick = () => sc.actions[+b.dataset.a].fn(ENG.S, ENG.t));
+  $('#faultBtn').textContent = 'Inyectar fallo: ' + (sc.tasks.find(d => d.faultable) || { sensor: 'sensor' }).sensor;
+  $('#scenReal').innerHTML = sc.real;
+  renderCode(); taskTable(); health(); serialUi();
+}
+let uiT = 0, lastFrame = performance.now();
+function frame(now) {
+  const dt = Math.min(50, now - lastFrame); lastFrame = now;
+  if (ACTIVE === 'simulador') {
+    if (!ENG.paused) { const n = Math.round(dt * +$('#speed').value); for (let i = 0; i < n; i++) engStep(); }
+    ENG.sc.draw(ENG.S, ENG.t);
+    drawTimeline();
+    uiT += dt;
+    if (uiT > 200) { uiT = 0; taskTable(); health(); serialUi(); $('#scenMetrics').innerHTML = ENG.sc.metrics(ENG.S, ENG.t); }
+  } else if (anim[ACTIVE]) anim[ACTIVE](dt);
+  requestAnimationFrame(frame);
+}
+onShow.simulador = () => { if (ENG.sc) { ENG.sc.draw(ENG.S, ENG.t); drawTimeline(); } };
+
+/* ============ escena: helpers de dibujo ============ */
+const WW = 800, WH = 500;
+function sceneCtx() {
+  const { x, w, h } = fit($('#sceneCv'));
+  const s = Math.min(w / WW, h / WH), ox = (w - WW * s) / 2, oy = (h - WH * s) / 2;
+  x.save(); x.clearRect(0, 0, w, h); x.translate(ox, oy); x.scale(s, s);
+  return { x, w, h, s };
+}
+function rr(x, a, b, w, h, r, fill, stroke, lw = 1.5) { x.beginPath(); x.roundRect(a, b, w, h, r); if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = lw; x.stroke(); } }
+function haltOverlay(x, S) {
+  if (!S.halted) return;
+  x.fillStyle = rgba(C.bad, .12); x.fillRect(0, 0, WW, WH);
+  rr(x, WW / 2 - 210, 16, 420, 40, 6, rgba(C.bad, .92));
+  txt(x, 'SISTEMA DETENIDO · salidas congeladas', WW / 2, 42, 'center', '#fff', 16, 700);
+}
+function badge(x, t, px, py, col) { x.font = '600 12px "JetBrains Mono", monospace'; const w = x.measureText(t).width + 14; rr(x, px, py, w, 22, 4, col); txt(x, t, px + 7, py + 15, 'left', '#fff', 12, 600); return w; }
+function kv(rows) { return `<div class="kv">${rows.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('')}</div>`; }
+const pill = (t, c) => `<span class="pill ${c}">${t}</span>`;
+/* =====================================================================
+   ESCENARIOS
+   ===================================================================== */
+const D2R = Math.PI / 180;
+function realCard(title, rows, note) {
+  return `<span class="tag">Aplicación en la vida real</span><h3>${title}</h3><dl class="reallife">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>${note ? `<p class="note">${note}</p>` : ''}`;
+}
+
+/* ---------------- 1. BRAZO ROBÓTICO ---------------- */
+const ARM = { bx: 470, by: 430, L1: 165, L2: 150, pickX: 300, beltY: 330, beltX0: 30, beltX1: 420, binX: 690, home: [470, 200] };
+function armIK(px, py) {
+  const dx = px - ARM.bx, dy = ARM.by - py; let r = Math.hypot(dx, dy); r = Math.min(r, ARM.L1 + ARM.L2 - 2);
+  const c = clamp((r * r - ARM.L1 ** 2 - ARM.L2 ** 2) / (2 * ARM.L1 * ARM.L2), -1, 1);
+  const s = dx < 0 ? 1 : -1, q2 = s * Math.acos(c);
+  const q1 = Math.atan2(dy, dx) - Math.atan2(ARM.L2 * Math.sin(q2), ARM.L1 + ARM.L2 * Math.cos(q2));
+  return [q1, q2];
+}
+function armFK(q) {
+  const ex = ARM.bx + ARM.L1 * Math.cos(q[0]), ey = ARM.by - ARM.L1 * Math.sin(q[0]);
+  return [[ex, ey], [ex + ARM.L2 * Math.cos(q[0] + q[1]), ey - ARM.L2 * Math.sin(q[0] + q[1])]];
+}
+const SC_ARM = {
+  name: 'Brazo robótico', tag: 'pick and place · 3 ejes', col: 'copper',
+  imports: ['from drivers.brazo import Brazo      # PCA9685 a 50 Hz', 'from drivers.vl53l0x import VL53L0X  # ToF por I2C', 'from comunicacion import mqtt'],
+  cppInc: ['#include "Brazo.h"      // PCA9685', '#include "VL53L0X.h"', '#include "Mqtt.h"'],
+  cppSetup: ['brazo.begin(); tof.begin(); mqtt.begin();'],
+  tasks: [
+    { fn: 'control_servos', doc: 'rampa de 1.8° por eje cada 20 ms', period: 20, cost: 2, tol: 15, crit: true, prio: 10, core: 1,
+      py: ['brazo.paso()'], cpp: ['brazo.paso();'], act: (S, t) => armControl(S, t) },
+    { fn: 'paro_emergencia', doc: 'botón NC en GPIO 27', period: 10, cost: 0.3, tol: 20, crit: true, prio: 12, core: 1,
+      py: ['if not paro.value(): brazo.detener()'], cpp: ['if (!digitalRead(PIN_PARO)) brazo.detener();'],
+      act: (S, t) => { if (S.estopReq != null && !S.estop) { S.estop = true; S.belt = false; S.reaction = t - S.estopReq; slog('sy', `[paro_emergencia] brazo detenido ${S.reaction} ms después de pulsar`); } } },
+    { fn: 'sensor_objeto', doc: 'detecta la caja frente al brazo', period: 30, cost: 3, tol: 40, prio: 8, core: 1,
+      faultable: true, sensor: 'VL53L0X', exc: 'OSError: [Errno 116] ETIMEDOUT', onErrTxt: 'banda detenida, reintento en 30 ms',
+      py: ['d = tof.read()', 'banda.parar_si(d < 60)'],
+      pyErr: ['banda.detener()            # estado seguro'],
+      cppGood: ['uint16_t d;', 'if (!tof.leer(&d)) {            // verificar SIEMPRE', '  log_e("VL53L0X sin respuesta"); banda.detener();', '} else banda.pararSi(d < 60);'],
+      cppBad: ['uint16_t d = tof.leerSinVerificar();  // ✗ basura si falla I2C', 'banda.pararSi(d < 60);'],
+      act: (S, t) => armSensor(S, t), onErr: S => { S.belt = false; } },
+    { fn: 'planificar_trayectoria', doc: 'cinemática inversa de 40 puntos', period: 1000, cost: 150, tol: 1500, heavy: true, prio: 5, core: 1,
+      loop: 'for i in range(40):', inner: 'ruta[i] = cinematica_inversa(objetivo, i)', py: [],
+      cppLoop: 'for (int i = 0; i < 40; i++) {', cppInner: 'ruta[i] = cinematicaInversa(objetivo, i);', cpp: [],
+      act: S => { S.plans = (S.plans || 0) + 1; } },
+    { fn: 'telemetria_mqtt', doc: 'estado del brazo a la planta', period: 1000, cost: 6, tol: 2000, culprit: true, block: 1000, prio: 3, core: 0,
+      py: ['await mqtt.publicar("celda1/brazo", brazo.estado())'], cpp: ['mqtt.publicar("celda1/brazo", brazo.estado());'],
+      act: (S, t) => { S.pubs = (S.pubs || 0) + 1; if (S.pubs % 3 === 1) slog('', `[telemetria_mqtt] celda1/brazo · ${S.placed} cajas`); } }
+  ],
+  init(S) {
+    Object.assign(S, { belt: true, boxes: [], spawn: 400, placed: 0, lost: 0, mode: 'idle', q: armIK(...ARM.home), target: null, held: null, estop: false, estopReq: null, reaction: null, lastCtl: null, gaps: [], jumps: 0, cycles: [], cycStart: 0, beltPos: 0, wait: 0, binN: 0 });
+  },
+  update(S, dt, t) {
+    if (S.belt) { S.beltPos += 0.07 * dt; for (const b of S.boxes) if (!b.held) b.x += 0.07 * dt; }
+    S.spawn -= dt;
+    if (S.spawn <= 0) { S.spawn = 2600; if (S.belt && !S.boxes.some(b => !b.held && b.x < 90)) S.boxes.push({ x: ARM.beltX0 + 10, held: false }); }
+    for (let i = S.boxes.length - 1; i >= 0; i--) { const b = S.boxes[i]; if (!b.held && b.x > ARM.beltX1 + 6) { S.boxes.splice(i, 1); S.lost++; if (S.target === b) S.target = null; slog('er', `[planta] caja ${S.placed + S.lost} cayó al final de la banda`); } }
+  },
+  draw(S, t) {
+    const { x } = sceneCtx();
+    rr(x, 0, 0, WW, WH, 0, C.bg);
+    x.fillStyle = C.soft; x.fillRect(0, 440, WW, 60);
+    // banda
+    rr(x, ARM.beltX0, ARM.beltY, ARM.beltX1 - ARM.beltX0, 20, 10, C.ink);
+    x.strokeStyle = C.muted; x.lineWidth = 2;
+    for (let k = -1; k < 14; k++) { const px = ARM.beltX0 + ((k * 30 + S.beltPos) % 390 + 390) % 390; x.beginPath(); x.moveTo(px, ARM.beltY + 3); x.lineTo(px + 8, ARM.beltY + 17); x.stroke(); }
+    for (const px of [ARM.beltX0 + 10, ARM.beltX1 - 10]) { x.fillStyle = C.muted; x.beginPath(); x.arc(px, ARM.beltY + 10, 8, 0, 7); x.fill(); }
+    x.fillStyle = C.muted; x.fillRect(60, 350, 8, 90); x.fillRect(380, 350, 8, 90);
+    txt(x, 'banda ' + (S.belt ? 'en marcha' : 'detenida'), ARM.beltX0, ARM.beltY + 40, 'left', S.belt ? C.ok : C.warn, 12, 600);
+    // sensor ToF
+    const det = S.boxes.some(b => !b.held && Math.abs(b.x - ARM.pickX) < 14);
+    x.fillStyle = C.muted; x.fillRect(ARM.pickX - 3, 150, 6, 30); rr(x, ARM.pickX - 16, 176, 32, 16, 3, C.info);
+    txt(x, 'VL53L0X', ARM.pickX, 170, 'center', C.ink, 10);
+    x.setLineDash([4, 4]); x.strokeStyle = det ? C.ok : rgba(C.info, .6); x.lineWidth = 2; x.beginPath(); x.moveTo(ARM.pickX, 192); x.lineTo(ARM.pickX, ARM.beltY); x.stroke(); x.setLineDash([]);
+    // contenedor
+    x.strokeStyle = C.ink; x.lineWidth = 3; x.beginPath(); x.moveTo(620, 300); x.lineTo(625, 440); x.lineTo(755, 440); x.lineTo(760, 300); x.stroke();
+    for (let i = 0; i < Math.min(S.binN, 12); i++) { const c = i % 3, r = Math.floor(i / 3); rr(x, 636 + c * 38, 404 - r * 34, 32, 32, 3, C.copper, C.ink, 1); }
+    txt(x, `contenedor · ${S.placed}`, 690, 460, 'center', C.ink, 12, 600);
+    // cajas
+    for (const b of S.boxes) if (!b.held) rr(x, b.x - 17, ARM.beltY - 34, 34, 34, 3, C.copper, C.ink, 1);
+    // brazo
+    x.fillStyle = C.muted; x.beginPath(); x.moveTo(ARM.bx - 40, 440); x.lineTo(ARM.bx - 22, ARM.by - 6); x.lineTo(ARM.bx + 22, ARM.by - 6); x.lineTo(ARM.bx + 40, 440); x.fill();
+    const [el, tip] = armFK(S.q);
+    x.lineCap = 'round';
+    x.strokeStyle = C.pcb; x.lineWidth = 18; x.beginPath(); x.moveTo(ARM.bx, ARM.by); x.lineTo(el[0], el[1]); x.stroke();
+    x.strokeStyle = C.info; x.lineWidth = 13; x.beginPath(); x.moveTo(el[0], el[1]); x.lineTo(tip[0], tip[1]); x.stroke();
+    x.lineCap = 'butt';
+    for (const p of [[ARM.bx, ARM.by], el]) { x.fillStyle = C.ink; x.beginPath(); x.arc(p[0], p[1], 10, 0, 7); x.fill(); x.fillStyle = C.gold; x.beginPath(); x.arc(p[0], p[1], 4, 0, 7); x.fill(); }
+    if (S.held) rr(x, tip[0] - 17, tip[1] + 2, 34, 34, 3, C.copper, C.ink, 1);
+    const open = S.held ? 19 : 24;
+    x.strokeStyle = C.ink; x.lineWidth = 4; x.beginPath(); x.moveTo(tip[0] - open, tip[1] + 18); x.lineTo(tip[0] - open, tip[1]); x.lineTo(tip[0] + open, tip[1]); x.lineTo(tip[0] + open, tip[1] + 18); x.stroke();
+    // paro
+    x.fillStyle = C.gold; x.beginPath(); x.arc(52, 52, 30, 0, 7); x.fill();
+    x.fillStyle = S.estop ? '#8a1c12' : C.bad; x.beginPath(); x.arc(52, 52, 20, 0, 7); x.fill();
+    txt(x, S.estop ? 'PARO ACTIVO' : S.estopReq != null ? 'pulsado…' : 'paro listo', 92, 48, 'left', S.estop ? C.bad : C.ink, 13, 700);
+    if (S.reaction != null) txt(x, `reacción ${S.reaction} ms`, 92, 66, 'left', S.reaction > 100 ? C.bad : C.ok, 12, 600);
+    const g = S.gaps.slice(-10), avg = g.length ? g.reduce((a, b) => a + b, 0) / g.length : 0;
+    txt(x, `control cada ${avg.toFixed(0)} ms`, WW - 20, 40, 'right', avg > 60 ? C.bad : C.ink, 13, 600);
+    txt(x, `modo: ${S.mode}`, WW - 20, 60, 'right', C.muted, 12);
+    haltOverlay(x, S); x.restore();
+  },
+  metrics(S) {
+    const g = S.gaps.slice(-10), avg = g.length ? g.reduce((a, b) => a + b, 0) / g.length : 0;
+    const cyc = S.cycles.slice(-5), cAvg = cyc.length ? cyc.reduce((a, b) => a + b, 0) / cyc.length : 0;
+    return kv([['Cajas colocadas', `<b>${S.placed}</b>`], ['Cajas perdidas', S.lost ? pill(S.lost, 'bad') : '0'], ['Ciclo de recogida', cAvg ? fmtS(cAvg) : '—'],
+      ['Periodo real del control', `${avg.toFixed(0)} ms (objetivo 20 ms)`], ['Movimientos a saltos', S.jumps ? pill(S.jumps, 'warn') : '0'],
+      ['Reacción del paro', S.reaction == null ? 'pulsa el paro para medirla' : S.reaction > 100 ? pill(S.reaction + ' ms', 'bad') : pill(S.reaction + ' ms', 'ok')]]);
+  },
+  actions: [
+    { label: 'Pulsar paro de emergencia', warn: true, fn: (S, t) => { if (!S.estop && S.estopReq == null) { S.estopReq = t; slog('sy', '>>> operario pulsa el paro de emergencia'); } } },
+    { label: 'Rearmar', fn: S => { S.estop = false; S.estopReq = null; slog('sy', '>>> paro rearmado'); } }
+  ],
+  real: realCard('Celdas pick and place en manufactura', [
+    ['Dónde se usa', 'Empaque de alimentos y farmacéutica, clasificación de paquetes en centros logísticos, ensamble electrónico y brazos colaborativos (cobots) junto a operarios.'],
+    ['Hardware típico', 'ESP32 + driver PCA9685 para servos a 50 Hz, sensor ToF VL53L0X, relé de banda, botón de paro con contacto NC y fuente separada para los servos.'],
+    ['Práctica crítica', 'Tareas cortas: el lazo de control a 50 Hz no puede esperar a un cálculo de trayectoria de 150 ms. Y try/except: un fallo del I²C debe dejar la banda en estado seguro.']
+  ], 'En una máquina real el paro de emergencia corta la energía por hardware con un relé de seguridad. La tarea de software solo registra el evento y lleva el sistema a un estado conocido.')
+};
+function armSensor(S) {
+  const b = S.boxes.find(b => !b.held && Math.abs(b.x - ARM.pickX) < 14);
+  if (S.estop) { S.belt = false; return; }
+  if (b) { S.belt = false; if (S.mode === 'idle' && !S.target) { S.target = b; S.cycStart = ENG.t; } }
+  else S.belt = true;
+}
+function armControl(S, t) {
+  if (S.lastCtl != null) { const gap = t - S.lastCtl; S.gaps.push(gap); if (S.gaps.length > 40) S.gaps.shift(); if (gap > 60) S.jumps++; }
+  S.lastCtl = t;
+  if (S.estop) return;
+  const b = S.target; let tg;
+  switch (S.mode) {
+    case 'idle': tg = ARM.home; if (b) S.mode = 'ir'; break;
+    case 'ir': tg = [b.x, 230]; break;
+    case 'bajar': tg = [b.x, ARM.beltY - 36]; break;
+    case 'agarrar': tg = [b.x, ARM.beltY - 36]; if (t >= S.wait) { b.held = true; S.held = b; S.mode = 'subir'; } break;
+    case 'subir': tg = [b.x, 200]; break;
+    case 'llevar': tg = [ARM.binX, 235]; break;
+    case 'soltar': tg = [ARM.binX, 290]; break;
+    case 'volver': tg = ARM.home; break;
+  }
+  if (!tg) tg = ARM.home;
+  const qt = armIK(tg[0], tg[1]), STEP = 1.8 * D2R;
+  for (let j = 0; j < 2; j++) S.q[j] += clamp(qt[j] - S.q[j], -STEP, STEP);
+  if (Math.abs(qt[0] - S.q[0]) < 0.01 && Math.abs(qt[1] - S.q[1]) < 0.01) {
+    if (S.mode === 'ir') S.mode = 'bajar';
+    else if (S.mode === 'bajar') { S.mode = 'agarrar'; S.wait = t + 250; }
+    else if (S.mode === 'subir') S.mode = 'llevar';
+    else if (S.mode === 'llevar') S.mode = 'soltar';
+    else if (S.mode === 'soltar') { S.boxes.splice(S.boxes.indexOf(S.held), 1); S.held = null; S.target = null; S.placed++; S.binN++; S.cycles.push(t - S.cycStart); S.mode = 'volver'; }
+    else if (S.mode === 'volver') S.mode = 'idle';
+  }
+}
+
+/* ---------------- 2. DOMÓTICA E INMÓTICA ---------------- */
+const ROOMS = [
+  { n: 'Oficina A', x: 40, y: 50, w: 260, h: 170, f: 2 }, { n: 'Sala de reuniones', x: 300, y: 50, w: 240, h: 170, f: 2 }, { n: 'Recepción', x: 540, y: 50, w: 220, h: 170, f: 2 },
+  { n: 'Sala', x: 40, y: 280, w: 260, h: 170, f: 1 }, { n: 'Cocina', x: 300, y: 280, w: 220, h: 170, f: 1 }, { n: 'Habitación', x: 520, y: 280, w: 240, h: 170, f: 1 }
+];
+function roomAt(px, py) { return ROOMS.findIndex(r => px > r.x && px < r.x + r.w && py > r.y && py < r.y + r.h); }
+function pickSpot(f) { const opts = ROOMS.map((r, i) => i).filter(i => ROOMS[i].f === f); const r = ROOMS[opts[Math.floor(Math.random() * opts.length)]]; return [rnd(r.x + 25, r.x + r.w - 25), rnd(r.y + 30, r.y + r.h - 25)]; }
+const SC_HOME = {
+  name: 'Domótica e inmótica', tag: 'vivienda + oficinas', col: 'gold',
+  imports: ['from drivers.pir import PIR          # 6 sensores HC-SR501', 'from drivers.dht import DHT22', 'from drivers.mq2 import MQ2          # humo por ADC', 'from comunicacion import mqtt, panel'],
+  cppInc: ['#include "Zonas.h"', '#include <DHT.h>', '#include "Mqtt.h"'],
+  cppSetup: ['zonas.begin(); dht.begin(); mqtt.begin();'],
+  tasks: [
+    { fn: 'leer_pir', doc: 'presencia → luces de cada zona', period: 100, cost: 1, tol: 200, crit: true, prio: 8, core: 1,
+      py: ['for z in zonas: z.luz(z.pir.value())'], cpp: ['for (auto &z : zonas) z.luz(digitalRead(z.pinPir));'], act: (S, t) => homePir(S, t) },
+    { fn: 'detector_humo', doc: 'MQ-2 en cocina, umbral 25 %', period: 200, cost: 1, tol: 300, crit: true, prio: 12, core: 1,
+      py: ['if humo.read() > UMBRAL_HUMO: alarma.activar()'], cpp: ['if (analogRead(PIN_MQ2) > UMBRAL_HUMO) alarma.activar();'], act: (S, t) => homeSmoke(S, t) },
+    { fn: 'termostato', doc: 'consigna 23 °C ocupado / 26 °C vacío', period: 2000, cost: 6, tol: 2500, prio: 6, core: 1,
+      faultable: true, sensor: 'DHT22', exc: 'OSError: [Errno 110] ETIMEDOUT', onErrTxt: 'se conserva la última lectura válida',
+      py: ['dht.measure()', 'clima.regular(dht.temperature())'], pyErr: ['clima.usar_ultimo_valor()  # máx. 3 lecturas'],
+      cppGood: ['float t = dht.readTemperature();', 'if (isnan(t)) {                  // el DHT devuelve NaN al fallar', '  log_w("DHT22 sin lectura"); clima.usarUltimoValor();', '} else clima.regular(t);'],
+      cppBad: ['clima.regular(dht.readTemperature());  // ✗ NaN llega al control'],
+      act: (S, t) => homeThermo(S, t) },
+    { fn: 'persianas', doc: 'cierra con sol directo', period: 500, cost: 2, tol: 1000, prio: 4, core: 1,
+      py: ['persianas.ajustar(luxometro.read())'], cpp: ['persianas.ajustar(luxometro.leer());'], act: S => { S.blindT = S.sun > .7 ? 1 : 0; } },
+    { fn: 'panel_web', doc: 'genera el tablero HTML del edificio', period: 1500, cost: 140, tol: 3000, heavy: true, prio: 3, core: 0,
+      loop: 'for i, z in enumerate(zonas):', inner: 'html += panel.fila(z)', py: ['await servidor.enviar(html)'],
+      cppLoop: 'for (int i = 0; i < N_ZONAS; i++) {', cppInner: 'html += panel.fila(zonas[i]);', cpp: ['servidor.enviar(html);'], act: () => {} },
+    { fn: 'mqtt_home_assistant', doc: 'estado a Home Assistant', period: 1000, cost: 6, tol: 2000, culprit: true, block: 1000, prio: 3, core: 0,
+      py: ['await mqtt.publicar("edificio/estado", resumen())'], cpp: ['mqtt.publicar("edificio/estado", resumen());'],
+      act: S => { S.pubs = (S.pubs || 0) + 1; if (S.pubs % 4 === 1) slog('', `[mqtt] edificio/estado · ${S.rooms.filter(r => r.light).length} luces encendidas`); } }
+  ],
+  init(S) {
+    S.rooms = ROOMS.map(r => ({ light: false, occ: false, temp: rnd(24.5, 27), meas: 25, hvac: false, lastSeen: -1e9, pend: null, smoke: 0, blind: 0 }));
+    S.people = [1, 1, 2, 2].map(f => { const p = pickSpot(f); return { f, x: p[0], y: p[1], tx: p[0], ty: p[1], dwell: rnd(500, 2500) }; });
+    Object.assign(S, { lat: [], smokeOn: false, alarm: false, crossT: null, smokeReact: null, energy: 0, wasteLight: 0, sun: .3, blindT: 0 });
+  },
+  update(S, dt, t) {
+    S.sun = .5 + .5 * Math.sin(t / 40000 * 2 * Math.PI - 1);
+    for (const p of S.people) {
+      const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+      if (d > 1) { const v = Math.min(d, .09 * dt); p.x += dx / d * v; p.y += dy / d * v; }
+      else if ((p.dwell -= dt) <= 0) { const q = pickSpot(p.f); p.tx = q[0]; p.ty = q[1]; p.dwell = rnd(1500, 4500); }
+    }
+    S.rooms.forEach((r, i) => {
+      const occ = S.people.some(p => roomAt(p.x, p.y) === i);
+      if (occ && !r.occ && !r.light && r.pend == null) r.pend = t;
+      r.occ = occ;
+      r.temp += ((29.5 - r.temp) * 0.00002 + (r.hvac ? -0.0009 : 0) + (occ ? 0.00015 : 0)) * dt;
+      if (r.hvac) S.energy += 1.2 * dt / 3600;
+      if (r.light && !occ) S.wasteLight += dt;
+      r.blind += (S.blindT - r.blind) * 0.002 * dt;
+    });
+    const k = S.rooms[4];
+    if (S.smokeOn) { k.smoke = Math.min(1, k.smoke + 0.0005 * dt); if (k.smoke > .25 && S.crossT == null) S.crossT = t; }
+    else k.smoke = Math.max(0, k.smoke - 0.0003 * dt);
+  },
+  draw(S, t) {
+    const { x } = sceneCtx();
+    rr(x, 0, 0, WW, WH, 0, C.bg);
+    txt(x, 'PISO 2 · OFICINAS (INMÓTICA)', 40, 40, 'left', C.muted, 11, 600);
+    txt(x, 'PISO 1 · VIVIENDA (DOMÓTICA)', 40, 270, 'left', C.muted, 11, 600);
+    ROOMS.forEach((R, i) => {
+      const r = S.rooms[i];
+      const warm = clamp((r.temp - 21) / 8, 0, 1);
+      rr(x, R.x, R.y, R.w, R.h, 2, rgba(warm > .5 ? C.copper : C.info, .08 + Math.abs(warm - .5) * .25), C.ink, 3);
+      if (r.light) { const g = x.createRadialGradient(R.x + R.w / 2, R.y + R.h / 2, 10, R.x + R.w / 2, R.y + R.h / 2, R.w * .7); g.addColorStop(0, rgba(C.gold, .55)); g.addColorStop(1, rgba(C.gold, .05)); x.fillStyle = g; x.fillRect(R.x + 2, R.y + 2, R.w - 4, R.h - 4); }
+      // ventana + persiana
+      x.fillStyle = rgba(C.info, .35); x.fillRect(R.x + 20, R.y - 3, 60, 6);
+      x.fillStyle = C.muted; x.fillRect(R.x + 20, R.y - 3, 60 * r.blind, 6);
+      // lámpara
+      x.fillStyle = r.light ? C.gold : C.line; x.beginPath(); x.arc(R.x + R.w / 2, R.y + 18, 7, 0, 7); x.fill();
+      txt(x, R.n, R.x + 10, R.y + R.h - 12, 'left', C.ink, 12, 600);
+      txt(x, `${r.temp.toFixed(1)} °C`, R.x + R.w - 10, R.y + R.h - 12, 'right', C.ink, 12);
+      if (r.hvac) badge(x, 'A/C', R.x + R.w - 52, R.y + 10, C.info);
+      if (r.smoke > .02) for (let k = 0; k < 14; k++) { x.fillStyle = rgba(C.muted, r.smoke * .45); x.beginPath(); x.arc(R.x + 30 + (k * 53 % (R.w - 50)), R.y + 40 + (k * 37 % 90) + Math.sin(t / 400 + k) * 6, 14 + r.smoke * 14, 0, 7); x.fill(); }
+    });
+    for (const p of S.people) { x.fillStyle = C.vio; x.beginPath(); x.arc(p.x, p.y - 8, 6, 0, 7); x.fill(); x.fillRect(p.x - 5, p.y - 2, 10, 14); }
+    if (S.alarm && Math.floor(t / 300) % 2) { x.strokeStyle = C.bad; x.lineWidth = 8; x.strokeRect(4, 4, WW - 8, WH - 8); badge(x, 'ALARMA DE HUMO · COCINA', 290, 462, C.bad); }
+    // sol
+    x.fillStyle = rgba(C.gold, .3 + S.sun * .6); x.beginPath(); x.arc(770, 24, 14, 0, 7); x.fill();
+    haltOverlay(x, S); x.restore();
+  },
+  metrics(S) {
+    const l = S.lat.slice(-8), avg = l.length ? l.reduce((a, b) => a + b, 0) / l.length : 0, mx = l.length ? Math.max(...l) : 0;
+    const occ = S.rooms.filter(r => r.occ).length;
+    return kv([['Luz al entrar (prom. / máx.)', l.length ? `${avg.toFixed(0)} / ${mx.toFixed(0)} ms ${mx > 500 ? pill('se nota', 'bad') : pill('inmediata', 'ok')}` : '—'],
+      ['Alarma de humo', S.smokeReact != null ? (S.smokeReact > 500 ? pill(`${S.smokeReact} ms tras superar el umbral`, 'bad') : pill(`${S.smokeReact} ms tras superar el umbral`, 'ok')) : S.smokeOn ? 'esperando detección…' : 'usa "Humo en la cocina"'],
+      ['Zonas ocupadas', `${occ} de 6`], ['Luz encendida sin nadie', fmtS(S.wasteLight)], ['Energía de climatización', `${S.energy.toFixed(1)} Wh (simulado)`]]);
+  },
+  actions: [
+    { label: 'Humo en la cocina', warn: true, fn: S => { S.smokeOn = true; S.crossT = null; S.smokeReact = null; slog('sy', '>>> se quema algo en la cocina'); } },
+    { label: 'Ventilar y apagar alarma', fn: S => { S.smokeOn = false; S.alarm = false; slog('sy', '>>> alarma reconocida'); } }
+  ],
+  real: realCard('Hogares y edificios inteligentes', [
+    ['Domótica', 'Luces por presencia, climatización, persianas motorizadas y alarmas en viviendas, integradas con Home Assistant o asistentes de voz.'],
+    ['Inmótica', 'Edificios de oficinas, hoteles y hospitales: consigna de temperatura según ocupación, iluminación por zonas, control de accesos y reportes de consumo energético.'],
+    ['Hardware típico', 'ESP32 por zona + PIR HC-SR501, DHT22 o SHT31, MQ-2 para humo, relés o triacs para luces, MQTT hacia un servidor central.'],
+    ['Práctica crítica', 'gather() y tareas cortas: la detección de humo convive con un servidor web y la telemetría, y nunca debe esperar a ninguno de los dos.']
+  ], 'Un detector de humo comercial certificado es un equipo independiente. El ESP32 complementa con avisos y automatizaciones; no lo reemplaza.')
+};
+function homePir(S, t) {
+  S.rooms.forEach(r => {
+    if (r.occ) { r.lastSeen = t; if (!r.light) { r.light = true; if (r.pend != null) { S.lat.push(t - r.pend); if (S.lat.length > 30) S.lat.shift(); } } r.pend = null; }
+    else if (r.light && t - r.lastSeen > 3000) r.light = false;
+  });
+}
+function homeSmoke(S, t) {
+  const k = S.rooms[4];
+  if (k.smoke > .25 && !S.alarm) { S.alarm = true; S.smokeReact = t - (S.crossT ?? t); slog('er', `[detector_humo] ¡ALARMA! humo ${(k.smoke * 100).toFixed(0)} % en cocina · reacción ${S.smokeReact} ms`); }
+}
+function homeThermo(S, t) {
+  S.rooms.forEach(r => {
+    r.meas = r.temp; const occ = t - r.lastSeen < 8000, sp = occ ? 23 : 26;
+    if (r.meas > sp + .5) r.hvac = true; else if (r.meas < sp - .5) r.hvac = false;
+  });
+}
+
+/* ---------------- 3. ESTACIÓN METEOROLÓGICA ---------------- */
+const SC_METEO = {
+  name: 'Estación meteorológica', tag: 'IoT ambiental', col: 'info',
+  imports: ['from drivers.bme280 import BME280    # T, HR, presión por I2C', 'from drivers.viento import Anemometro, Veleta', 'from drivers.lluvia import Pluviometro  # IRQ por balancín', 'from drivers.oled import Pantalla', 'from comunicacion import thingspeak'],
+  cppInc: ['#include <Adafruit_BME280.h>', '#include "Viento.h"', '#include "ThingSpeak.h"'],
+  cppSetup: ['if (!bme.begin(0x76)) log_e("BME280 no encontrado");', 'anemometro.begin(PIN_ANEMO); // cuenta pulsos por IRQ'],
+  tasks: [
+    { fn: 'anemometro', doc: 'muestrea el viento cada 250 ms para detectar ráfagas', period: 250, cost: 1, tol: 300, crit: true, prio: 9, core: 1,
+      py: ['muestras.append(anemometro.velocidad())'], cpp: ['muestras.push(anemometro.velocidad());'], act: (S, t) => { S.samples.push([t, S.wind]); if (S.samples.length > 200) S.samples.shift(); } },
+    { fn: 'leer_bme280', doc: 'temperatura, humedad y presión', period: 1000, cost: 4, tol: 1500, prio: 7, core: 1,
+      faultable: true, sensor: 'BME280', exc: 'OSError: [Errno 19] ENODEV', onErrTxt: 'dato marcado como inválido, reintento',
+      py: ['t, p, h = bme.read_compensated_data()', 'datos.actualizar(t, p, h)'], pyErr: ['datos.marcar_invalido()      # no publicar basura'],
+      cppGood: ['if (!bme.takeForcedMeasurement()) {', '  log_w("BME280 sin respuesta"); datos.marcarInvalido();', '} else datos.actualizar(bme.readTemperature(), bme.readPressure(), bme.readHumidity());'],
+      cppBad: ['datos.actualizar(bme.readTemperature(), bme.readPressure(), bme.readHumidity());  // ✗'],
+      act: S => { S.meas.T = S.T + gauss() * .05; S.meas.H = S.H; S.meas.P = S.Pr; S.meas.ok = true; }, onErr: S => { S.meas.ok = false; } },
+    { fn: 'veleta', doc: 'dirección del viento por ADC', period: 500, cost: 1, tol: 1000, prio: 6, core: 1,
+      py: ['datos.dir = veleta.grados()'], cpp: ['datos.dir = veleta.grados();'], act: S => { S.meas.dir = S.dir; } },
+    { fn: 'pluviometro', doc: '0.2794 mm por pulso del balancín', period: 1000, cost: 0.5, tol: 2000, prio: 6, core: 1,
+      py: ['datos.lluvia = pluvio.pulsos * 0.2794'], cpp: ['datos.lluvia = pluvio.pulsos() * 0.2794f;'], act: S => { S.meas.rain = S.rainPulses * 0.2794; } },
+    { fn: 'pantalla_oled', doc: 'redibuja la OLED SSD1306', period: 1000, cost: 90, tol: 2000, heavy: true, prio: 4, core: 1,
+      loop: 'for fila in range(8):', inner: 'oled.text(lineas[fila], 0, fila * 8)', py: ['oled.show()'],
+      cppLoop: 'for (int fila = 0; fila < 8; fila++) {', cppInner: 'oled.drawString(0, fila * 8, lineas[fila]);', cpp: ['oled.display();'],
+      act: (S, t) => { S.oled = { ...S.meas, gust: S.samplesMax() }; S.oledT = t; } },
+    { fn: 'subir_thingspeak', doc: 'el plan gratuito exige 15 s entre envíos', period: 15000, cost: 8, tol: 20000, culprit: true, block: 15000, prio: 3, core: 0,
+      py: ['await thingspeak.enviar(datos)'], cpp: ['thingspeak.enviar(datos);'],
+      act: S => { S.ups = (S.ups || 0) + 1; slog('', `[thingspeak] HTTP 200 · T=${S.meas.T.toFixed(1)} °C · ráfaga ${S.samplesMax().toFixed(1)} m/s`); } }
+  ],
+  init(S) {
+    Object.assign(S, { wind: 4, dir: 200, T: 18, H: 70, Pr: 1013, rainPulses: 0, raining: false, rainNext: 3000, tip: 0, cup: 0, gust: null, gustNext: 2500, gTot: 0, gDet: 0, gustLog: [], samples: [], hist: [], meas: { T: 18, H: 70, P: 1013, dir: 200, rain: 0, ok: true }, oled: null, oledT: 0 });
+    S.samplesMax = () => S.samples.filter(([t]) => t > ENG.t - 10000).reduce((a, [, v]) => Math.max(a, v), 0);
+  },
+  update(S, dt, t) {
+    let g = 0;
+    if (S.gust) { const p = (t - S.gust.t0) / S.gust.dur; if (p >= 1) { const det = S.samples.some(([ts, v]) => ts >= S.gust.t0 && ts <= S.gust.t0 + S.gust.dur && v >= S.gust.base + .6 * S.gust.amp); S.gTot++; if (det) S.gDet++; S.gustLog.push([S.gust.t0, S.gust.dur, det]); if (S.gustLog.length > 12) S.gustLog.shift(); S.gust = null; } else g = S.gust.amp * Math.sin(Math.PI * p); }
+    else if ((S.gustNext -= dt) <= 0) { S.gust = { t0: t, dur: rnd(600, 1400), amp: rnd(6, 10), base: 0 }; S.gustNext = rnd(3000, 6000); }
+    const base = 4 + 1.5 * Math.sin(t / 7000); if (S.gust) S.gust.base = base;
+    S.wind = Math.max(0, base + g + Math.sin(t / 310) * .3);
+    S.dir = (200 + 40 * Math.sin(t / 9000) + 360) % 360;
+    S.T = 18 + 5 * Math.sin(2 * Math.PI * t / 60000); S.H = 70 - 1.8 * (S.T - 18); S.Pr = 1013 + 2 * Math.sin(t / 23000);
+    if ((S.rainNext -= dt) <= 0) { S.raining = !S.raining; S.rainNext = S.raining ? rnd(6000, 10000) : rnd(8000, 14000); }
+    if (S.raining && (S.tip += dt) > 900) { S.tip = 0; S.rainPulses++; }
+    S.cup += S.wind * 0.0012 * dt;
+    if (t % 50 === 0) { S.hist.push([t, S.wind]); if (S.hist.length > 400) S.hist.shift(); }
+  },
+  draw(S, t) {
+    const { x } = sceneCtx();
+    rr(x, 0, 0, WW, WH, 0, rgba(C.info, .08)); x.fillStyle = C.bg; x.fillRect(0, 0, WW, WH); x.fillStyle = rgba(C.info, .1); x.fillRect(0, 0, 360, 420);
+    x.fillStyle = C.soft; x.fillRect(0, 420, 360, 80);
+    if (S.raining) { x.strokeStyle = rgba(C.info, .5); x.lineWidth = 1.5; for (let k = 0; k < 40; k++) { const px = (k * 47 + t * .25) % 360, py = (k * 89 + t * .6) % 420; x.beginPath(); x.moveTo(px, py); x.lineTo(px - 3, py + 10); x.stroke(); } }
+    // mástil
+    x.fillStyle = C.muted; x.fillRect(176, 90, 8, 330);
+    // anemómetro
+    x.fillStyle = C.ink; x.fillRect(176, 70, 8, 22);
+    for (let k = 0; k < 3; k++) { const a = S.cup + k * 2.094, ex = 180 + Math.cos(a) * 34, ey = 70 + Math.sin(a) * 9; x.strokeStyle = C.ink; x.lineWidth = 2; x.beginPath(); x.moveTo(180, 70); x.lineTo(ex, ey); x.stroke(); x.fillStyle = C.copper; x.beginPath(); x.arc(ex, ey, 7, 0, 7); x.fill(); }
+    txt(x, `${S.wind.toFixed(1)} m/s`, 225, 74, 'left', C.ink, 13, 600);
+    // veleta
+    const va = (S.dir - 90) * D2R; x.save(); x.translate(180, 130); x.rotate(va); x.fillStyle = C.ink; x.fillRect(-30, -2, 60, 4); x.beginPath(); x.moveTo(30, 0); x.lineTo(20, -8); x.lineTo(20, 8); x.fill(); x.fillStyle = C.copper; x.fillRect(-34, -9, 10, 18); x.restore();
+    txt(x, `${S.dir.toFixed(0)}°`, 225, 134, 'left', C.ink, 12);
+    // abrigo meteorológico
+    rr(x, 196, 190, 70, 70, 3, C.panel, C.ink, 2); for (let k = 0; k < 5; k++) { x.strokeStyle = C.line; x.beginPath(); x.moveTo(200, 200 + k * 12); x.lineTo(262, 200 + k * 12); x.stroke(); }
+    txt(x, 'BME280', 231, 278, 'center', C.ink, 11, 600);
+    // pluviómetro
+    rr(x, 60, 330, 46, 80, 4, C.panel, C.ink, 2); x.fillStyle = rgba(C.info, .5); x.fillRect(62, 408 - Math.min(76, S.rainPulses * 1.5), 42, Math.min(76, S.rainPulses * 1.5));
+    txt(x, 'pluviómetro', 83, 325, 'center', C.ink, 11);
+    // ESP32 + OLED
+    rr(x, 220, 310, 120, 96, 6, C.pcb); rr(x, 230, 320, 100, 62, 3, '#081210');
+    if (S.oled) { const o = S.oled; ['T ' + o.T.toFixed(1) + 'C  HR ' + o.H.toFixed(0) + '%', 'P ' + o.P.toFixed(0) + ' hPa', 'raf ' + o.gust.toFixed(1) + ' m/s', 'dir ' + (o.dir || 0).toFixed(0) + ' ' + (o.ok ? '' : 'ERR')].forEach((s, k) => txt(x, s, 234, 334 + k * 13, 'left', '#7ee0ff', 9.5)); }
+    const age = (t - S.oledT) / 1000; txt(x, `OLED hace ${age.toFixed(1)} s`, 280, 398, 'center', age > 3 ? '#ffb4a6' : '#cfeee2', 9);
+    // gráfica
+    const gx = 390, gy = 40, gw = 390, gh = 250, T0 = t - 20000, X = tt => gx + (tt - T0) / 20000 * gw, Y = v => gy + gh - v / 16 * gh;
+    rr(x, gx, gy, gw, gh, 4, C.panel, C.line, 1);
+    for (const v of [0, 4, 8, 12, 16]) { x.strokeStyle = C.line; x.beginPath(); x.moveTo(gx, Y(v)); x.lineTo(gx + gw, Y(v)); x.stroke(); txt(x, v, gx - 6, Y(v) + 4, 'right', C.muted, 10); }
+    txt(x, 'viento real (línea) vs. muestras (puntos) · m/s', gx, gy - 10, 'left', C.ink, 11, 600);
+    for (const [t0, dur, det] of S.gustLog) { if (t0 + dur < T0) continue; x.fillStyle = rgba(det ? C.ok : C.bad, .15); x.fillRect(Math.max(gx, X(t0)), gy, X(t0 + dur) - Math.max(gx, X(t0)), gh); txt(x, det ? '✓' : '✗', X(t0 + dur / 2), gy + 14, 'center', det ? C.ok : C.bad, 13, 700); }
+    x.strokeStyle = C.muted; x.lineWidth = 1.5; x.beginPath(); let first = true;
+    for (const [tt, v] of S.hist) { if (tt < T0) continue; first ? x.moveTo(X(tt), Y(v)) : x.lineTo(X(tt), Y(v)); first = false; } x.stroke();
+    x.fillStyle = C.info; for (const [tt, v] of S.samples) { if (tt < T0) continue; x.beginPath(); x.arc(X(tt), Y(v), 3, 0, 7); x.fill(); }
+    // lecturas
+    const m = S.meas;
+    [['Temperatura', `${m.T.toFixed(1)} °C`], ['Humedad', `${m.H.toFixed(0)} %`], ['Presión', `${m.P.toFixed(1)} hPa`], ['Lluvia', `${m.rain.toFixed(2)} mm`]].forEach(([k, v], i) => {
+      const bx = gx + (i % 2) * 200, by = 320 + Math.floor(i / 2) * 70; rr(x, bx, by, 190, 58, 4, C.panel, C.line, 1);
+      txt(x, k.toUpperCase(), bx + 12, by + 20, 'left', C.muted, 10, 600); txt(x, v, bx + 12, by + 44, 'left', m.ok || i > 2 ? C.ink : C.bad, 18, 600);
+    });
+    haltOverlay(x, S); x.restore();
+  },
+  metrics(S) {
+    return kv([['Ráfagas detectadas', S.gTot ? `${S.gDet} de ${S.gTot} ${S.gDet / S.gTot < .7 ? pill('se pierden picos', 'bad') : pill('bien', 'ok')}` : 'esperando la primera…'],
+      ['Ráfaga máxima medida (10 s)', `${S.samplesMax().toFixed(1)} m/s`], ['Envíos a ThingSpeak', S.ups || 0], ['Lectura BME280', S.meas.ok ? pill('válida', 'ok') : pill('inválida, no se publica', 'warn')], ['OLED actualizada hace', fmtS(ENG.t - S.oledT)]]);
+  },
+  actions: [{ label: 'Forzar ráfaga', fn: (S, t) => { if (!S.gust) { S.gust = { t0: t, dur: 900, amp: 10, base: 0 }; slog('sy', '>>> ráfaga de viento'); } } }],
+  real: realCard('Estaciones meteorológicas IoT', [
+    ['Dónde se usa', 'Agricultura de precisión, alertas tempranas por lluvia en cuencas y laderas, monitoreo urbano de calidad del aire y redes ciudadanas de datos abiertos.'],
+    ['Hardware típico', 'ESP32 + BME280 por I²C, anemómetro de cazoletas y pluviómetro de balancín con contacto reed (pulsos por interrupción), veleta resistiva por ADC, panel solar y deep sleep.'],
+    ['Práctica crítica', 'Evitar time.sleep(): el límite de 15 s de ThingSpeak tienta a usar time.sleep(15), y eso deja ciego al anemómetro justo cuando pasa la ráfaga.']
+  ], 'Los pulsos del pluviómetro se cuentan en una interrupción, así que no se pierden aunque el ciclo esté bloqueado. Las ráfagas sí, porque dependen del muestreo de una tarea.')
+};
+
+/* ---------------- 4. ROBOT MÓVIL AGV ---------------- */
+const TR = { cx1: 250, cx2: 550, cy: 250, r: 140 };
+TR.L = 2 * (TR.cx2 - TR.cx1) + 2 * Math.PI * TR.r;
+function trackPos(s) {
+  s = ((s % TR.L) + TR.L) % TR.L; const S1 = TR.cx2 - TR.cx1, A = Math.PI * TR.r;
+  if (s < S1) return [TR.cx1 + s, TR.cy - TR.r, 0];
+  s -= S1; if (s < A) { const a = -Math.PI / 2 + s / TR.r; return [TR.cx2 + TR.r * Math.cos(a), TR.cy + TR.r * Math.sin(a), a + Math.PI / 2]; }
+  s -= A; if (s < S1) return [TR.cx2 - s, TR.cy + TR.r, Math.PI];
+  s -= S1; const a = Math.PI / 2 + s / TR.r; return [TR.cx1 + TR.r * Math.cos(a), TR.cy + TR.r * Math.sin(a), a + Math.PI / 2];
+}
+const ahead = (S, o) => ((o.s - S.s) % TR.L + TR.L) % TR.L;
+const SC_AGV = {
+  name: 'Robot móvil AGV', tag: 'logística interna', col: 'vio',
+  imports: ['from drivers.motores import Motores    # puente H TB6612', 'from drivers.linea import SensorLinea  # 5 infrarrojos', 'from drivers.hcsr04 import HCSR04', 'from comunicacion import wifi'],
+  cppInc: ['#include "Motores.h"', '#include "SensorLinea.h"', '#include "HCSR04.h"'],
+  cppSetup: ['motores.begin(); linea.begin(); sonar.begin();'],
+  tasks: [
+    { fn: 'seguir_linea', doc: 'corrección PD con 5 sensores IR', period: 10, cost: 1, tol: 20, crit: true, prio: 10, core: 1,
+      py: ['motores.corregir(pd.calcular(linea.error()))'], cpp: ['motores.corregir(pd.calcular(linea.error()));'], act: S => { S.e *= .15; } },
+    { fn: 'ultrasonido', doc: 'distancia al obstáculo de enfrente', period: 60, cost: 1, tol: 90, crit: true, prio: 9, core: 1,
+      faultable: true, sensor: 'HC-SR04', exc: 'OSError: [Errno 116] ETIMEDOUT', onErrTxt: 'se asume obstáculo y se frena',
+      py: ['dist_cm = sonar.distancia_cm()'], pyErr: ['dist_cm = 0                # ante la duda, frenar'],
+      cppGood: ['float d = sonar.distanciaCm();', 'if (d < 0) {                       // -1 = sin eco', '  log_w("HC-SR04 sin eco"); distCm = 0;   // frenar', '} else distCm = d;'],
+      cppBad: ['distCm = sonar.distanciaCm();  // ✗ -1 se interpreta como "libre"'],
+      act: S => { S.dist = S.trueDist(); }, onErr: S => { S.dist = 0; } },
+    { fn: 'control_motores', doc: 'velocidad según distancia libre', period: 20, cost: 2, tol: 40, crit: true, prio: 10, core: 1,
+      py: ['motores.velocidad(0 if dist_cm < 45 else 35 if dist_cm < 130 else 90)'], cpp: ['motores.velocidad(distCm < 45 ? 0 : distCm < 130 ? 35 : 90);'],
+      act: S => { const v = S.dist < 45 ? 0 : S.dist < 130 ? .035 : .09; if (v === 0 && S.vCmd > 0 && S.dist > 0) S.brakes++; S.vCmd = v; } },
+    { fn: 'bateria', doc: 'divisor resistivo en GPIO 35', period: 5000, cost: 1, tol: 8000, prio: 2, core: 1,
+      py: ['nivel = bateria.porcentaje()'], cpp: ['nivel = bateria.porcentaje();'], act: S => { S.bat = Math.max(5, S.bat - .4); } },
+    { fn: 'planificar_ruta', doc: 'A* sobre el mapa de la bodega', period: 2000, cost: 160, tol: 4000, heavy: true, prio: 4, core: 0,
+      loop: 'for nodo in mapa.vecinos(actual):', inner: 'a_estrella.expandir(nodo)', py: ['ruta = a_estrella.resultado()'],
+      cppLoop: 'for (auto &nodo : mapa.vecinos(actual)) {', cppInner: 'aEstrella.expandir(nodo);', cpp: ['ruta = aEstrella.resultado();'], act: () => {} },
+    { fn: 'telemetria_wifi', doc: 'posición al sistema de gestión', period: 1000, cost: 6, tol: 2000, culprit: true, block: 1000, prio: 3, core: 0,
+      py: ['await wifi.enviar(posicion())'], cpp: ['wifi.enviar(posicion());'],
+      act: S => { S.pubs = (S.pubs || 0) + 1; if (S.pubs % 4 === 1) slog('', `[telemetria] AGV-03 · vuelta ${S.laps} · batería ${S.bat.toFixed(0)} %`); } }
+  ],
+  init(S) {
+    Object.assign(S, { s: 40, v: 0, vCmd: 0, e: 0, drift: 0, off: false, offT: 0, offs: 0, obs: [], obsNext: 1500, coll: 0, brakes: 0, stun: 0, laps: 0, dist: 400, bat: 100, flash: 0 });
+    S.trueDist = () => S.obs.reduce((a, o) => { const d = ahead(S, o); return d < 400 ? Math.min(a, d) : a; }, 400);
+  },
+  update(S, dt, t) {
+    if ((S.obsNext -= dt) <= 0) { S.obsNext = rnd(3500, 6000); S.obs.push({ s: (S.s + rnd(260, 520)) % TR.L, t0: t, life: rnd(4500, 6500), k: Math.random() < .5 ? 'persona' : 'estiba' }); }
+    S.obs = S.obs.filter(o => t - o.t0 < o.life);
+    if (S.off) { S.v = 0; if (t - S.offT > 1500) { S.off = false; S.e = 0; } }
+    else if (t < S.stun) S.v = 0;
+    else { const a = S.vCmd > S.v ? .00025 : .0008; S.v += clamp(S.vCmd - S.v, -a * dt, a * dt); }
+    const prev = S.s; S.s += S.v * dt; if (Math.floor(S.s / TR.L) > Math.floor(prev / TR.L)) S.laps++;
+    S.drift = clamp(S.drift + gauss() * .00004 * dt, -.035, .035);
+    S.e += S.drift * (S.v / .09) * dt;
+    if (!S.off && Math.abs(S.e) > 22) { S.off = true; S.offT = t; S.offs++; slog('er', '[planta] el AGV perdió la línea y se detuvo'); }
+    for (const o of S.obs) { const d = ahead(S, o); if (d < 16 && S.v > .005) { S.coll++; S.flash = t; S.stun = t + 900; S.v = 0; o.life = 0; slog('er', `[planta] ¡colisión con ${o.k === 'persona' ? 'una persona' : 'una estiba'}!`); } }
+  },
+  draw(S, t) {
+    const { x } = sceneCtx();
+    rr(x, 0, 0, WW, WH, 0, C.bg);
+    x.fillStyle = C.soft; for (const [a, b, w, h] of [[20, 20, 760, 40], [20, 440, 760, 40], [320, 180, 160, 140]]) x.fillRect(a, b, w, h);
+    txt(x, 'ESTANTERÍA', 400, 45, 'center', C.muted, 11, 600); txt(x, 'ESTANTERÍA', 400, 465, 'center', C.muted, 11, 600); txt(x, 'ZONA DE CARGA', 400, 255, 'center', C.muted, 11, 600);
+    x.strokeStyle = C.ink; x.lineWidth = 6; x.beginPath();
+    for (let s = 0; s <= TR.L; s += 6) { const [px, py] = trackPos(s); s ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); x.stroke();
+    for (const o of S.obs) { const [px, py] = trackPos(o.s); if (o.k === 'persona') { x.fillStyle = C.vio; x.beginPath(); x.arc(px, py - 10, 8, 0, 7); x.fill(); x.fillRect(px - 7, py - 2, 14, 18); } else rr(x, px - 14, py - 12, 28, 24, 2, C.copper, C.ink, 1); }
+    const [rx, ry, ra] = trackPos(S.s), nx = -Math.sin(ra), ny = Math.cos(ra), px = rx + nx * S.e, py = ry + ny * S.e;
+    x.save(); x.translate(px, py); x.rotate(ra);
+    const d = S.trueDist(), dm = Math.min(d, 160);
+    x.fillStyle = rgba(S.dist < 45 ? C.bad : S.dist < 130 ? C.warn : C.ok, .18); x.beginPath(); x.moveTo(16, 0); x.lineTo(16 + dm, -dm * .25); x.lineTo(16 + dm, dm * .25); x.fill();
+    rr(x, -18, -14, 36, 28, 6, S.off ? C.bad : C.info, C.ink, 2); x.fillStyle = C.gold; x.fillRect(12, -6, 6, 12);
+    x.restore();
+    if (t - S.flash < 600) { x.strokeStyle = C.bad; x.lineWidth = 4; x.beginPath(); x.arc(px, py, 34, 0, 7); x.stroke(); }
+    badge(x, `v ${(S.v * 1000).toFixed(0)} cm/s`, 610, 470, S.v > .001 ? C.pcb : C.muted);
+    if (S.off) badge(x, 'FUERA DE LÍNEA', 300, 470, C.bad);
+    haltOverlay(x, S); x.restore();
+  },
+  metrics(S) {
+    return kv([['Colisiones', S.coll ? pill(S.coll, 'bad') : pill('0', 'ok')], ['Frenadas a tiempo', S.brakes], ['Salidas de línea', S.offs ? pill(S.offs, 'warn') : '0'],
+      ['Vueltas completas', S.laps], ['Distancia medida', `${S.dist.toFixed(0)} cm`], ['Batería', `${S.bat.toFixed(0)} %`]]);
+  },
+  actions: [{ label: 'Persona cruza enfrente', warn: true, fn: (S, t) => { S.obs.push({ s: (S.s + 150) % TR.L, t0: t, life: 5000, k: 'persona' }); slog('sy', '>>> una persona cruza frente al AGV'); } }],
+  real: realCard('Vehículos de guiado automático en bodegas', [
+    ['Dónde se usa', 'Centros de distribución, hospitales que transportan insumos, plantas automotrices y robots repartidores de interiores.'],
+    ['Hardware típico', 'ESP32 + puente H TB6612 o drivers de motor DC con encoder, regleta de 5 sensores infrarrojos, HC-SR04 o LiDAR, batería LiPo con medición por ADC.'],
+    ['Práctica crítica', 'try/except con estado seguro: si el sensor de distancia falla, el robot debe asumir que hay un obstáculo y frenar.']
+  ], 'Los AGV industriales usan escáneres láser de seguridad certificados. Un HC-SR04 sirve para aprender el patrón, no para proteger personas.')
+};
+
+/* ---------------- 5. INVERNADERO ---------------- */
+const SC_GREEN = {
+  name: 'Invernadero', tag: 'riego automatizado', col: 'ok',
+  imports: ['from drivers.ads1115 import ADS1115   # 4 sensores capacitivos', 'from drivers.sht31 import SHT31', 'from drivers.valvulas import Valvulas', 'from comunicacion import mqtt'],
+  cppInc: ['#include <Adafruit_ADS1X15.h>', '#include <Adafruit_SHT31.h>', '#include "Valvulas.h"'],
+  cppSetup: ['ads.begin(); sht.begin(0x44); valvulas.begin();'],
+  tasks: [
+    { fn: 'control_riego', doc: 'abre < 35 %, cierra ≥ 60 %', period: 250, cost: 1, tol: 500, crit: true, prio: 9, core: 1,
+      py: ['for c in camas: c.valvula(c.humedad < 35 or (c.abierta and c.humedad < 60))'], cpp: ['for (auto &c : camas) c.valvula(c.humedad < 35 || (c.abierta && c.humedad < 60));'],
+      act: S => S.beds.forEach(b => { if (b.meas == null) return; if (b.meas < 35) b.valve = true; else if (b.meas >= 60) b.valve = false; }) },
+    { fn: 'humedad_suelo', doc: '4 canales del ADS1115 por I2C', period: 500, cost: 4, tol: 800, prio: 8, core: 1,
+      faultable: true, sensor: 'ADS1115', exc: 'OSError: [Errno 5] EIO', onErrTxt: 'válvulas cerradas hasta la próxima lectura',
+      py: ['for i, c in enumerate(camas): c.humedad = ads.porcentaje(i)'], pyErr: ['valvulas.cerrar_todas()     # estado seguro'],
+      cppGood: ['for (int i = 0; i < 4; i++) {', '  int16_t raw = ads.readADC_SingleEnded(i);', '  if (raw < 0) { valvulas.cerrarTodas(); break; }  // lectura inválida', '  camas[i].humedad = aPorcentaje(raw);', '}'],
+      cppBad: ['for (int i = 0; i < 4; i++) camas[i].humedad = aPorcentaje(ads.readADC_SingleEnded(i));  // ✗'],
+      act: S => S.beds.forEach(b => { b.meas = b.m; }), onErr: S => S.beds.forEach(b => { b.valve = false; }) },
+    { fn: 'ventilacion', doc: 'extractor > 28 °C', period: 1000, cost: 2, tol: 2000, prio: 6, core: 1,
+      py: ['extractor.value(sht.temperatura() > 28)'], cpp: ['digitalWrite(PIN_EXTRACTOR, sht.readTemperature() > 28);'], act: S => { if (S.T > 28) S.fan = true; else if (S.T < 26) S.fan = false; } },
+    { fn: 'analizar_cultivo', doc: 'índice de verdor de la imagen', period: 3000, cost: 220, tol: 6000, heavy: true, prio: 3, core: 0,
+      loop: 'for fila in range(48):', inner: 'verde += indice_verdor(imagen, fila)', py: ['salud = verde / 48'],
+      cppLoop: 'for (int fila = 0; fila < 48; fila++) {', cppInner: 'verde += indiceVerdor(imagen, fila);', cpp: ['salud = verde / 48.0f;'], act: S => { S.health = S.beds.reduce((a, b) => a + (b.m > 30 && b.m < 80 ? 1 : 0), 0) / 4; } },
+    { fn: 'telemetria', doc: 'estado del cultivo por MQTT', period: 2000, cost: 6, tol: 4000, culprit: true, block: 2000, prio: 3, core: 0,
+      py: ['await mqtt.publicar("invernadero/1", estado())'], cpp: ['mqtt.publicar("invernadero/1", estado());'],
+      act: S => { S.pubs = (S.pubs || 0) + 1; if (S.pubs % 4 === 1) slog('', `[telemetria] agua usada ${S.water.toFixed(1)} L`); } }
+  ],
+  init(S) { Object.assign(S, { beds: [48, 40, 55, 37].map(m => ({ m, meas: m, valve: false })), water: 0, waste: 0, outMs: 0, T: 25, fan: false, fanA: 0, sun: .5, health: 1 }); },
+  update(S, dt, t) {
+    S.sun = .5 + .5 * Math.sin(t / 30000 * 2 * Math.PI);
+    S.T += ((22 + 9 * S.sun - S.T) * 0.0003 + (S.fan ? -0.0012 : 0)) * dt;
+    if (S.fan) S.fanA += .02 * dt;
+    S.beds.forEach((b, i) => {
+      b.m = clamp(b.m - (0.0006 + i * .00008) * (1 + .8 * S.sun) * dt + (b.valve ? 0.011 * dt : 0), 0, 100);
+      if (b.valve) { S.water += 0.0015 * dt; if (b.m > 75) S.waste += 0.0015 * dt; }
+      if (b.m < 25 || b.m > 80) S.outMs += dt / 4;
+    });
+  },
+  draw(S, t) {
+    const { x } = sceneCtx();
+    rr(x, 0, 0, WW, WH, 0, C.bg);
+    x.fillStyle = rgba(C.gold, .3 + S.sun * .6); x.beginPath(); x.arc(60, 50, 22, 0, 7); x.fill();
+    x.strokeStyle = C.muted; x.lineWidth = 3; x.fillStyle = rgba(C.info, .06);
+    x.beginPath(); x.moveTo(40, 440); x.lineTo(40, 200); x.quadraticCurveTo(400, 30, 760, 200); x.lineTo(760, 440); x.fill(); x.stroke();
+    for (let k = 1; k < 6; k++) { x.strokeStyle = C.line; x.lineWidth = 1; x.beginPath(); x.moveTo(40 + k * 120, 440); x.lineTo(40 + k * 120, 200 - Math.sin(k / 6 * Math.PI) * 85); x.stroke(); }
+    // extractor
+    x.save(); x.translate(700, 200); x.fillStyle = C.panel; x.beginPath(); x.arc(0, 0, 24, 0, 7); x.fill(); x.strokeStyle = C.ink; x.lineWidth = 2; x.stroke(); x.rotate(S.fanA);
+    for (let k = 0; k < 4; k++) { x.rotate(Math.PI / 2); x.fillStyle = S.fan ? C.info : C.muted; x.beginPath(); x.ellipse(10, 0, 11, 5, 0, 0, 7); x.fill(); } x.restore();
+    txt(x, `${S.T.toFixed(1)} °C`, 700, 245, 'center', S.T > 28 ? C.bad : C.ink, 13, 600);
+    S.beds.forEach((b, i) => {
+      const bx = 80 + i * 165, by = 370;
+      rr(x, bx, by, 140, 50, 4, rgba(C.copper, .35 + b.m / 250), C.ink, 1.5);
+      const dry = b.m < 25, wet = b.m > 80, col = dry ? C.gold : wet ? C.warn : C.ok;
+      for (let k = 0; k < 4; k++) { const px = bx + 20 + k * 33, sz = dry ? 9 : 14; x.strokeStyle = C.pcb; x.lineWidth = 3; x.beginPath(); x.moveTo(px, by); x.lineTo(px, by - 30); x.stroke(); x.fillStyle = col; x.beginPath(); x.ellipse(px - 8, by - 26 + (dry ? 6 : 0), sz, 6, -.5, 0, 7); x.fill(); x.beginPath(); x.ellipse(px + 8, by - 30 + (dry ? 6 : 0), sz, 6, .5, 0, 7); x.fill(); }
+      // barra de humedad
+      const hx = bx + 10, hy = 200, hh = 120; rr(x, hx, hy, 18, hh, 3, C.panel, C.line, 1);
+      x.fillStyle = b.m > 75 ? C.bad : b.m < 30 ? C.warn : C.info; x.fillRect(hx + 2, hy + hh - b.m / 100 * hh, 14, b.m / 100 * hh);
+      for (const [v, c] of [[35, C.warn], [60, C.ok]]) { x.strokeStyle = c; x.lineWidth = 2; x.beginPath(); x.moveTo(hx - 4, hy + hh - v / 100 * hh); x.lineTo(hx + 22, hy + hh - v / 100 * hh); x.stroke(); }
+      txt(x, `${b.m.toFixed(0)} %`, hx + 30, hy + hh - b.m / 100 * hh + 4, 'left', C.ink, 12, 600);
+      txt(x, `cama ${i + 1}`, bx + 70, 440, 'center', C.ink, 12, 600);
+      // válvula + gotas
+      x.fillStyle = b.valve ? C.info : C.muted; x.fillRect(bx + 100, 330, 26, 10);
+      if (b.valve) for (let k = 0; k < 5; k++) { const py = 345 + ((t * .12 + k * 7) % 25); x.fillStyle = C.info; x.beginPath(); x.arc(bx + 104 + k * 4, py, 2, 0, 7); x.fill(); }
+    });
+    x.strokeStyle = C.info; x.lineWidth = 3; x.beginPath(); x.moveTo(60, 335); x.lineTo(740, 335); x.stroke();
+    haltOverlay(x, S); x.restore();
+  },
+  metrics(S) {
+    return kv([['Humedad por cama', S.beds.map(b => b.m.toFixed(0) + ' %').join(' · ')], ['Agua usada', `${S.water.toFixed(1)} L`],
+      ['Agua desperdiciada (sobre 75 %)', S.waste > .5 ? pill(S.waste.toFixed(1) + ' L', 'bad') : S.waste.toFixed(1) + ' L'], ['Tiempo fuera de rango', fmtS(S.outMs)], ['Extractor', S.fan ? 'encendido' : 'apagado']]);
+  },
+  actions: [{ label: 'Día muy caluroso', fn: S => { S.T = 31; slog('sy', '>>> ola de calor: 31 °C'); } }],
+  real: realCard('Agricultura protegida y huertas urbanas', [
+    ['Dónde se usa', 'Invernaderos de flores y hortalizas, cultivos hidropónicos, viveros y huertas escolares o urbanas con riego por goteo.'],
+    ['Hardware típico', 'ESP32 + sensores capacitivos de humedad por ADS1115, SHT31, electroválvulas de 12 V con relé o MOSFET, extractor y cámara ESP32-CAM opcional.'],
+    ['Práctica crítica', 'Manejo de errores: si el sensor deja de responder con las válvulas abiertas y no hay try/except, el cultivo se inunda.']
+  ], 'La histéresis entre 35 % y 60 % evita que la válvula abra y cierre sin parar; con un control lento, la humedad sobrepasa el límite y se desperdicia agua.')
+};
+
+SCEN = [SC_ARM, SC_HOME, SC_METEO, SC_AGV, SC_GREEN];
+/* ============ 02 · LAS CINCO PRÁCTICAS ============ */
+function codeHtml(src, cm = '#') {
+  return src.split('\n').map(l => {
+    if (l.includes('✗')) return `<span class="bad">${esc(l)}</span>`;
+    if (l.includes('✓')) return `<span class="good">${esc(l)}</span>`;
+    const i = l.indexOf(cm); return i >= 0 ? esc(l.slice(0, i)) + `<span class="c">${esc(l.slice(i))}</span>` : esc(l);
+  }).join('\n');
+}
+const PRACS = [
+  { n: 'asyncio.gather() para organizar las tareas', why: 'gather() lanza todas las corrutinas a la vez y espera a que terminen. Deja en un solo lugar la lista de lo que hace el equipo. Si una corrutina lanza una excepción, esta sube por gather() hasta main(); con return_exceptions=True la recibes como valor en lugar de detener el programa.',
+    rules: ['Una sola llamada a gather() en main() con todas las tareas de larga vida.', 'Nunca hagas await secuencial de dos bucles infinitos: el segundo jamás arranca.', 'Si necesitas cancelar una tarea luego, créala con create_task() y pasa el objeto Task a gather().'],
+    bad: `async def main():
+    await leer_sensores()     # ✗ bucle infinito: no retorna
+    await publicar_mqtt()     # ✗ nunca se ejecuta`,
+    good: `async def main():
+    sensores = asyncio.create_task(leer_sensores())
+    await asyncio.gather(        # ✓ todas corren a la vez
+        sensores,
+        publicar_mqtt(),
+        supervisor(),
+    )`,
+    cpp: `// En FreeRTOS cada tarea se crea una vez en setup()
+void setup() {
+  xTaskCreatePinnedToCore(leerSensores, "sens", 4096, NULL, 8, NULL, 1);
+  xTaskCreatePinnedToCore(publicarMqtt, "mqtt", 6144, NULL, 4, NULL, 0);
+  xTaskCreatePinnedToCore(supervisor,  "sup",  2048, NULL, 2, NULL, 1);
+}
+void loop() { vTaskDelete(NULL); }   // ✓ loop() no hace nada` },
+  { n: 'Evitar time.sleep()', why: 'time.sleep() detiene al intérprete completo: ninguna otra corrutina avanza mientras dura. await asyncio.sleep() solo suspende a la tarea que lo llama y devuelve el control al ciclo de eventos para que atienda a las demás.',
+    rules: ['Dentro de async def solo se espera con await asyncio.sleep() o sleep_ms().', 'Las librerías que bloquean (urequests, lectura de DHT en bucle) se reemplazan o se ejecutan con tiempos de espera cortos.', 'time.sleep_us() de pocos microsegundos sí es aceptable para tiempos de un protocolo.'],
+    bad: `async def subir_thingspeak():
+    while True:
+        await thingspeak.enviar(datos)
+        time.sleep(15)            # ✗ 15 s sin atender nada más`,
+    good: `async def subir_thingspeak():
+    while True:
+        await thingspeak.enviar(datos)
+        await asyncio.sleep(15)   # ✓ las demás tareas siguen`,
+    cpp: `// Arduino-ESP32: delay() llama a vTaskDelay y SÍ cede el núcleo.
+// El equivalente al error es la espera activa:
+uint32_t t = millis();
+while (millis() - t < 15000) {}          // ✗ acapara el núcleo
+
+vTaskDelayUntil(&t0, pdMS_TO_TICKS(15000)); // ✓ periodo exacto, cede` },
+  { n: 'Tareas cortas y cooperativas', why: 'En multitarea cooperativa nadie interrumpe a una corrutina. Un cálculo de 150 ms sin await retrasa 150 ms a todas las demás, incluido el lazo de control. La regla práctica: ninguna tarea debe retener la CPU más de unos pocos milisegundos seguidos.',
+    rules: ['Divide el trabajo largo en lotes y cede con await asyncio.sleep_ms(0) entre lotes.', 'Una tarea, una responsabilidad: leer, decidir o comunicar, no las tres.', 'Mide: un vigilante que registre el retraso al despertar revela qué tarea monopoliza el ciclo.'],
+    bad: `async def planificar():
+    for i in range(400):
+        ruta[i] = cinematica(i)   # ✗ 150 ms sin ceder`,
+    good: `async def planificar():
+    for i in range(400):
+        ruta[i] = cinematica(i)
+        if i % 20 == 0:
+            await asyncio.sleep_ms(0)   # ✓ cede el turno`,
+    cpp: `for (int i = 0; i < 400; i++) {
+  ruta[i] = cinematica(i);
+  if (i % 20 == 0) vTaskDelay(1);   // ✓ evita el task watchdog
+}` },
+  { n: 'try/except dentro de las corrutinas', why: 'Los sensores fallan: un cable flojo en el I²C produce OSError. Sin manejo, la excepción sube por gather() y detiene todo el sistema con las salidas congeladas. Con try/except dentro del bucle, la tarea registra el error, lleva el actuador a un estado seguro y lo intenta de nuevo.',
+    rules: ['Captura excepciones concretas (OSError, ValueError) cerca de donde ocurren.', 'Define un estado seguro por actuador: válvula cerrada, motor detenido, banda parada.', 'No te tragues asyncio.CancelledError: vuelve a lanzarla con raise.', 'Un try/except global alrededor de asyncio.run() registra el fallo y reinicia con machine.reset().'],
+    bad: `async def humedad_suelo():
+    while True:
+        h = ads.read(0)            # ✗ un OSError tumba todo
+        valvula.value(h < 35)
+        await asyncio.sleep(1)`,
+    good: `async def humedad_suelo():
+    while True:
+        try:
+            h = ads.read(0)
+            valvula.value(h < 35)
+        except OSError as e:       # ✓ fallo local, sistema vivo
+            log.error("ads1115", e)
+            valvula.off()          # ✓ estado seguro
+        await asyncio.sleep(1)`,
+    cpp: `// ESP-IDF compila sin excepciones de C++ por defecto:
+// se verifican los valores de retorno.
+int16_t raw = ads.readADC_SingleEnded(0);
+if (raw < 0) {                        // ✓ lectura inválida
+  log_e("ADS1115 sin respuesta");
+  digitalWrite(PIN_VALVULA, LOW);     // ✓ estado seguro
+} else digitalWrite(PIN_VALVULA, aPorcentaje(raw) < 35);` },
+  { n: 'Estructura recomendada de un proyecto real', why: 'Un solo main.py de 800 líneas funciona en la demo y se vuelve imposible de mantener. Separar configuración, controladores, tareas y utilidades permite cambiar un sensor sin tocar la lógica, probar partes en el PC y trabajar en equipo con Git.',
+    rules: ['config.py con pines y constantes; secrets.py fuera del repositorio.', 'drivers/ envuelve el hardware; tareas/ contiene las corrutinas; main.py solo arma y lanza.', 'Un supervisor alimenta el watchdog (machine.WDT) solo si todas las tareas reportan vida.', 'Registro (log) con niveles, y pruebas de los drivers en el PC con objetos simulados.'],
+    bad: `# main.py de 800 líneas
+SSID = "MiRed"; CLAVE = "1234"     # ✗ credenciales en el código
+def todo(): ...                     # ✗ lectura, red y lógica juntas`,
+    good: `# main.py: solo ensambla
+from config import PINES            # ✓ configuración aparte
+from tareas import lectura, comunicacion, supervisor
+asyncio.run(main())                 # ✓ ver la pestaña 03`,
+    cpp: `; platformio.ini
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+lib_deps = adafruit/Adafruit BME280 Library` }
+];
+function buildPracs() {
+  $('#pracList').innerHTML = PRACS.map((p, i) => `<div class="card lab">
+    <div class="lab-title"><h3>${i + 1}. ${p.n}</h3><span class="tag">práctica ${i + 1} de 5</span></div>
+    <p>${p.why}</p>
+    <ul class="clean">${p.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+    <div class="vs">
+      <div class="grid" style="grid-template-columns:1fr;gap:6px"><span class="lbl b">Error típico · MicroPython</span><pre class="code">${codeHtml(p.bad)}</pre></div>
+      <div class="grid" style="grid-template-columns:1fr;gap:6px"><span class="lbl g">Corrección · MicroPython</span><pre class="code">${codeHtml(p.good)}</pre></div>
+      <div class="grid" style="grid-template-columns:1fr;gap:6px;grid-column:1/-1"><span class="lbl">Equivalente · C++ ESP32</span><pre class="code">${codeHtml(p.cpp, i === 4 ? ';' : '//')}</pre></div>
+    </div></div>`).join('');
+}
+
+/* ============ 03 · ESTRUCTURA ============ */
+const TREE = {
+  py: { root: 'estacion_meteo/', items: [
+    ['boot.py', 0, 'Arranque', 'Se ejecuta primero en cada reinicio. Solo conecta el Wi-Fi y ajusta lo mínimo; nada de lógica de la aplicación.', `# boot.py
+import network, time
+from secrets import WIFI_SSID, WIFI_CLAVE
+
+sta = network.WLAN(network.STA_IF)
+sta.active(True)
+sta.connect(WIFI_SSID, WIFI_CLAVE)
+for _ in range(20):              # máx. 10 s, luego sigue sin red
+    if sta.isconnected():
+        break
+    time.sleep_ms(500)           # aquí sí: aún no hay ciclo de eventos`],
+    ['main.py', 0, 'Punto de entrada', 'Ensambla el sistema: crea los objetos, lanza las tareas con gather() y protege todo con un try/except final.', `# main.py
+import asyncio, machine
+import config
+from utils import log
+from drivers.sensores import Sensores
+from tareas import lectura, comunicacion, supervisor
+
+async def main():
+    log.info("estación v1.3 arrancando")
+    s = Sensores(config.PINES)
+    datos = {}
+    await asyncio.gather(
+        lectura.bme280(s, datos),
+        lectura.viento(s, datos),
+        comunicacion.thingspeak(datos),
+        supervisor.vigilar(),
+    )
+
+try:
+    asyncio.run(main())
+except Exception as e:
+    log.fatal(e)                 # queda en el archivo de registro
+    machine.reset()              # reinicio limpio
+finally:
+    asyncio.new_event_loop()     # útil al reejecutar desde el REPL`],
+    ['config.py', 0, 'Configuración', 'Pines, periodos y umbrales en un solo lugar. Cambiar de placa significa editar solo este archivo.', `# config.py
+PINES = {
+    "i2c_sda": 21, "i2c_scl": 22,
+    "anemometro": 34, "veleta": 35,
+    "pluviometro": 27, "led": 2,
+}
+PERIODO_BME_MS = 1000
+PERIODO_VIENTO_MS = 250
+PERIODO_SUBIDA_S = 15            # límite del plan gratuito
+WDT_TIMEOUT_MS = 8000`],
+    ['secrets.py', 0, 'Credenciales', 'Contraseñas y claves de API. Se agrega a .gitignore para que nunca llegue al repositorio público.', `# secrets.py  (en .gitignore)
+WIFI_SSID = "Laboratorio"
+WIFI_CLAVE = "********"
+THINGSPEAK_KEY = "XXXXXXXXXXXXXXXX"`],
+    ['lib/', 1], ['bme280.py', 2, 'Librería de terceros', 'Código externo sin modificar. Se instala con mip: import mip; mip.install("...").', `# lib/bme280.py
+# Controlador de terceros: no se edita aquí.
+# Si necesitas cambiarlo, envuélvelo en drivers/sensores.py`],
+    ['umqtt/simple.py', 2, 'Librería de terceros', 'Cliente MQTT oficial de micropython-lib.', `# lib/umqtt/simple.py
+# Instalado con: mpremote mip install umqtt.simple`],
+    ['drivers/', 1], ['sensores.py', 2, 'Controladores', 'Envuelve el hardware con una interfaz propia. Las tareas no saben si el sensor es un BME280 o un SHT31.', `# drivers/sensores.py
+from machine import I2C, Pin, ADC
+from bme280 import BME280
+
+class Sensores:
+    def __init__(self, pines):
+        i2c = I2C(0, sda=Pin(pines["i2c_sda"]), scl=Pin(pines["i2c_scl"]))
+        self.bme = BME280(i2c=i2c)
+        self.veleta = ADC(Pin(pines["veleta"]))
+        self.veleta.atten(ADC.ATTN_11DB)
+
+    def clima(self):
+        """Devuelve (°C, hPa, %HR). Puede lanzar OSError."""
+        t, p, h = self.bme.read_compensated_data()
+        return t / 100, p / 25600, h / 1024`],
+    ['actuadores.py', 2, 'Controladores', 'Relés, válvulas y motores, cada uno con su método de estado seguro.', `# drivers/actuadores.py
+from machine import Pin
+
+class Valvula:
+    def __init__(self, pin):
+        self.p = Pin(pin, Pin.OUT, value=0)
+    def abrir(self):  self.p.on()
+    def cerrar(self): self.p.off()
+    estado_seguro = cerrar        # usado por los except`],
+    ['tareas/', 1], ['lectura.py', 2, 'Tareas', 'Corrutinas cortas, cada una con su try/except y su periodo.', `# tareas/lectura.py
+import asyncio, config
+from utils import log
+from tareas.supervisor import latido
+
+async def bme280(s, datos):
+    while True:
+        try:
+            datos["t"], datos["p"], datos["h"] = s.clima()
+            datos["ok"] = True
+        except OSError as e:
+            datos["ok"] = False
+            log.error("bme280", e)
+        latido("bme280")
+        await asyncio.sleep_ms(config.PERIODO_BME_MS)`],
+    ['comunicacion.py', 2, 'Tareas', 'Red y nube. Nunca usa time.sleep(); reintenta con espera creciente.', `# tareas/comunicacion.py
+import asyncio
+from utils import log
+from utils.reintentos import con_reintentos
+
+async def thingspeak(datos):
+    while True:
+        if datos.get("ok"):
+            await con_reintentos(enviar, datos, intentos=3)
+        await asyncio.sleep(15)
+
+async def enviar(datos):
+    r, w = await asyncio.open_connection("api.thingspeak.com", 80)
+    w.write(peticion(datos)); await w.drain()
+    await r.readline(); w.close(); await w.wait_closed()`],
+    ['supervisor.py', 2, 'Tareas', 'Alimenta el watchdog de hardware solo si todas las tareas reportaron vida recientemente.', `# tareas/supervisor.py
+import asyncio, time, machine, config
+from utils import log
+
+_ultimo = {}
+def latido(nombre):
+    _ultimo[nombre] = time.ticks_ms()
+
+async def vigilar():
+    wdt = machine.WDT(timeout=config.WDT_TIMEOUT_MS)
+    while True:
+        ahora = time.ticks_ms()
+        vivas = all(time.ticks_diff(ahora, t) < 5000 for t in _ultimo.values())
+        if vivas:
+            wdt.feed()           # si una tarea se cuelga, el WDT reinicia
+        else:
+            log.error("supervisor", "tarea sin latido")
+        await asyncio.sleep(1)`],
+    ['utils/', 1], ['log.py', 2, 'Utilidades', 'Registro con niveles y marca de tiempo; guarda los errores en la flash.', `# utils/log.py
+import time
+NIVEL = 1   # 0 debug, 1 info, 2 error
+
+def _w(tag, *a):
+    print("%8d %s" % (time.ticks_ms(), tag), *a)
+
+def info(*a):  NIVEL <= 1 and _w("INFO ", *a)
+def error(*a):
+    _w("ERROR", *a)
+    with open("errores.log", "a") as f:
+        f.write("%d %s\\n" % (time.time(), a))
+def fatal(e): error("FATAL", repr(e))`],
+    ['reintentos.py', 2, 'Utilidades', 'Reintento con espera exponencial, reutilizable por cualquier tarea.', `# utils/reintentos.py
+import asyncio
+from utils import log
+
+async def con_reintentos(fn, *args, intentos=3, espera_ms=500):
+    for n in range(intentos):
+        try:
+            return await fn(*args)
+        except OSError as e:
+            log.error("reintento %d" % (n + 1), e)
+            await asyncio.sleep_ms(espera_ms * 2 ** n)
+    return None`],
+    ['tests/', 1], ['test_sensores.py', 2, 'Pruebas', 'Se ejecuta en el PC con CPython y un sensor simulado, sin placa conectada.', `# tests/test_sensores.py  (python -m pytest en el PC)
+import sys, types
+maq = types.ModuleType("machine"); maq.I2C = maq.Pin = maq.ADC = object
+sys.modules["machine"] = maq                  # hardware simulado
+sys.modules["bme280"] = types.SimpleNamespace(BME280=object)
+from drivers.sensores import Sensores
+
+class BMEFalso:
+    def read_compensated_data(self):
+        return 2350, 25920000, 61440   # 23.5 °C, 1012.5 hPa, 60 %
+
+def test_conversion():
+    s = Sensores.__new__(Sensores)
+    s.bme = BMEFalso()
+    t, p, h = s.clima()
+    assert abs(t - 23.5) < 0.01 and abs(h - 60) < 0.1`],
+    ['README.md', 0, 'Documentación', 'Cómo cablear, cargar y operar el equipo. Incluye el esquemático y la lista de materiales.', `# Estación meteorológica ESP32
+## Cableado
+BME280 → SDA 21, SCL 22 · Anemómetro → GPIO 34 · Pluviómetro → GPIO 27
+## Cargar
+mpremote cp -r . :
+## Operación
+Los errores quedan en errores.log; el LED parpadea 3 veces si no hay red.`]
+  ] },
+  cpp: { root: 'estacion_meteo/  (PlatformIO)', items: [
+    ['platformio.ini', 0, 'Proyecto', 'Placa, framework, velocidad del monitor y dependencias. Cualquier persona compila lo mismo.', `[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+lib_deps =
+    adafruit/Adafruit BME280 Library
+    mathworks/ThingSpeak
+build_flags = -DCORE_DEBUG_LEVEL=3`],
+    ['include/', 1], ['config.h', 2, 'Configuración', 'Pines y periodos como constantes de compilación.', `#pragma once
+constexpr int PIN_SDA = 21, PIN_SCL = 22;
+constexpr int PIN_ANEMO = 34, PIN_VELETA = 35, PIN_PLUVIO = 27;
+constexpr uint32_t PERIODO_BME_MS = 1000;
+constexpr uint32_t PERIODO_SUBIDA_MS = 15000;`],
+    ['secrets.h', 2, 'Credenciales', 'Fuera del repositorio (.gitignore).', `#pragma once
+#define WIFI_SSID  "Laboratorio"
+#define WIFI_CLAVE "********"
+#define TS_KEY     "XXXXXXXXXXXXXXXX"`],
+    ['src/', 1], ['main.cpp', 2, 'Punto de entrada', 'Solo crea las tareas FreeRTOS y el watchdog.', `#include <Arduino.h>
+#include <esp_task_wdt.h>
+#include "tareas.h"
+
+void setup() {
+  Serial.begin(115200);
+  sensores.begin();
+  xTaskCreatePinnedToCore(tareaBme,      "bme",  4096, NULL, 7, NULL, 1);
+  xTaskCreatePinnedToCore(tareaViento,   "vto",  3072, NULL, 9, NULL, 1);
+  xTaskCreatePinnedToCore(tareaSubida,   "net",  8192, NULL, 3, NULL, 0);
+  xTaskCreatePinnedToCore(tareaSupervisor,"sup", 2048, NULL, 2, NULL, 1);
+}
+void loop() { vTaskDelete(NULL); }`],
+    ['tareas.cpp', 2, 'Tareas', 'Cada tarea con vTaskDelayUntil y verificación de errores.', `#include "tareas.h"
+void tareaBme(void *) {
+  TickType_t t0 = xTaskGetTickCount();
+  for (;;) {
+    if (!sensores.leerClima(&datos)) {
+      log_w("BME280 sin respuesta");
+      datos.ok = false;
+    }
+    latido(LAT_BME);
+    vTaskDelayUntil(&t0, pdMS_TO_TICKS(PERIODO_BME_MS));
+  }
+}`],
+    ['lib/', 1], ['Sensores/Sensores.cpp', 2, 'Controladores', 'Biblioteca propia que envuelve el hardware.', `#include "Sensores.h"
+bool Sensores::leerClima(Datos *d) {
+  if (!bme.takeForcedMeasurement()) return false;
+  d->t = bme.readTemperature();
+  d->p = bme.readPressure() / 100.0f;
+  d->h = bme.readHumidity();
+  return !isnan(d->t);
+}`],
+    ['test/', 1], ['test_sensores.cpp', 2, 'Pruebas', 'Pruebas con Unity: pio test -e native.', `#include <unity.h>
+void test_conversion() {
+  TEST_ASSERT_FLOAT_WITHIN(0.01, 1012.5, paHaHpa(101250));
+}
+int main() { UNITY_BEGIN(); RUN_TEST(test_conversion); return UNITY_END(); }`]
+  ] }
+};
+let treeLang = 'py', treeSel = 'main.py';
+function buildTree() {
+  const T = TREE[treeLang]; $('#treeTitle').textContent = T.root;
+  let html = '';
+  T.items.forEach((it, i) => {
+    const [n, lvl] = it, pad = '  '.repeat(lvl);
+    if (it.length === 2) html += `<span class="dir">${pad}${esc(n)}</span>`;
+    else html += `<button data-i="${i}" aria-pressed="${n === treeSel}">${pad}${esc(n)}</button>`;
+  });
+  $('#tree').innerHTML = html;
+  $$('#tree button').forEach(b => b.onclick = () => { treeSel = T.items[+b.dataset.i][0]; buildTree(); });
+  let it = T.items.find(z => z[0] === treeSel && z.length > 2); if (!it) { it = T.items.find(z => z.length > 2); treeSel = it[0]; }
+  $('#fileName').textContent = it[0]; $('#fileRole').textContent = it[2]; $('#fileDesc').textContent = it[3];
+  $('#fileCode').innerHTML = codeHtml(it[4], it[0].endsWith('.ini') ? ';' : (it[0].endsWith('.h') || it[0].endsWith('.cpp')) ? '//' : '#');
+  $$('#treeLang .chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.t === treeLang ? 'true' : 'false'));
+}
+$$('#treeLang .chip').forEach(c => c.onclick = () => { treeLang = c.dataset.t; treeSel = treeLang === 'py' ? 'main.py' : 'main.cpp'; buildTree(); });
+function drawLayers() {
+  const { x, w, h } = fit($('#layerCv')); x.clearRect(0, 0, w, h);
+  const L = [['main.py · asyncio.gather()', 'Aplicación', 'copper'], ['tareas/ · corrutinas cortas con try/except', 'Tareas', 'pcb'], ['utils/ · log, reintentos, supervisor + WDT', 'Servicios', 'vio'], ['drivers/ · Sensores, Valvula, Motores', 'Controladores', 'info'], ['machine, network, asyncio · ESP-IDF', 'HAL', 'gold'], ['ESP32-WROOM-32 · BME280 · relés · motores', 'Hardware', 'muted']];
+  const n = L.length, gap = 6, bh = (h - gap * (n - 1) - 4) / n, lw = Math.min(150, w * .3);
+  L.forEach(([d, nm, c], i) => {
+    const y = 2 + i * (bh + gap), x0 = 4 + i * Math.min(14, w * .015), ww = w - 8 - x0 * 2 + 4;
+    x.fillStyle = rgba(C[c], .16); x.strokeStyle = C[c]; x.lineWidth = 1.5; x.beginPath(); x.roundRect(x0, y, ww, bh, 5); x.fill(); x.stroke();
+    txt(x, nm.toUpperCase(), x0 + 12, y + bh / 2 + 4, 'left', C[c] === C.muted ? C.ink : C[c], Math.min(12, bh * .4), 700);
+    txt(x, d, x0 + lw, y + bh / 2 + 4, 'left', C.ink, Math.min(12, bh * .38));
+  });
+}
+onShow.estructura = () => { buildTree(); drawLayers(); };
+
+/* ============ 04 · VERIFICACIÓN Y PREGUNTAS ============ */
+const CHECK = [
+  'main() lanza todas las tareas de larga vida con una sola llamada a asyncio.gather().',
+  'Ningún archivo dentro de tareas/ contiene time.sleep().',
+  'Ninguna tarea retiene la CPU más de unos pocos milisegundos sin un await.',
+  'Cada corrutina tiene try/except con excepciones concretas y un estado seguro.',
+  'CancelledError se vuelve a lanzar con raise si se captura.',
+  'Hay un try/except alrededor de asyncio.run() que registra y reinicia.',
+  'El watchdog de hardware solo se alimenta si todas las tareas reportan vida.',
+  'Pines y periodos están en config.py; las credenciales en secrets.py fuera de Git.',
+  'Los drivers se pueden probar en el PC con un sensor simulado.',
+  'Las tareas críticas tienen medido su retraso máximo en el equipo real.'
+];
+function buildCheck() {
+  let saved = {}; try { saved = JSON.parse(store('bp_check') || '{}'); } catch (e) {}
+  $('#checklist').innerHTML = CHECK.map((c, i) => `<label for="ck${i}"><input type="checkbox" id="ck${i}" ${saved[i] ? 'checked' : ''}><span>${esc(c)}</span></label>`).join('');
+  const upd = () => { const v = {}; let n = 0; $$('#checklist input').forEach((b, i) => { v[i] = b.checked; if (b.checked) n++; }); store('bp_check', JSON.stringify(v)); $('#chkCount').textContent = `${n} de ${CHECK.length}`; };
+  $$('#checklist input').forEach(b => b.onchange = upd); upd();
+}
+const QS = [
+  ['Análisis', 'En el brazo robótico, al desactivar "Tareas cortas", el contador de movimientos a saltos sube aunque el lazo de control no cambió. Explica la causa con el concepto de multitarea cooperativa.', ['El cálculo de 150 ms no tiene await', 'El control no puede ejecutarse hasta que el cálculo termine', 'Propone trocear con sleep_ms(0) y estima el retraso máximo resultante']],
+  ['Diseño', 'En la estación meteorológica, ThingSpeak exige 15 s entre envíos. Escribe la corrutina de subida correcta y explica por qué los pulsos del pluviómetro no se pierden pero las ráfagas sí cuando se usa time.sleep(15).', ['await asyncio.sleep(15) en lugar de time.sleep', 'Los pulsos se cuentan por interrupción, fuera del ciclo de eventos', 'Las ráfagas dependen del muestreo de una tarea que queda bloqueada']],
+  ['Crítica', 'Un compañero envolvió todo main() en un único try/except y dice que eso basta. Usa el escenario del invernadero para argumentar por qué no.', ['Un except global detiene todas las tareas aunque el fallo sea de un sensor', 'Las válvulas quedan en su último estado', 'El try/except local permite estado seguro y continuidad']],
+  ['Análisis', 'En el AGV, si el HC-SR04 falla, ¿qué valor debe asumir la tarea de distancia y por qué? Relaciónalo con el concepto de estado seguro.', ['Asumir distancia 0 u obstáculo presente', 'Frenar es la falla segura', 'Contrastar con el C++ que interpreta -1 como libre']],
+  ['Comparación', 'Explica por qué delay() en Arduino-ESP32 no es equivalente a time.sleep() en MicroPython asyncio, y cuál sería el error equivalente en C++.', ['delay() llama a vTaskDelay y cede a otras tareas FreeRTOS', 'time.sleep bloquea el único hilo del ciclo de eventos', 'El equivalente es la espera activa o un bucle largo sin ceder']],
+  ['Diseño', 'Propón la estructura de carpetas para el sistema de domótica con seis zonas y explica qué irá en drivers/, tareas/ y config.py.', ['drivers por tipo de sensor o actuador', 'una tarea por función: presencia, clima, humo, panel, MQTT', 'zonas y pines descritos en config, no en el código']],
+  ['Síntesis', '¿Qué ocurre con el watchdog del supervisor si una tarea se queda en un while True sin await? ¿Es eso bueno o malo para un equipo instalado en campo?', ['El ciclo se congela y el supervisor no alimenta el WDT', 'El WDT reinicia el equipo', 'Es deseable: recupera el sistema sin intervención, pero hay que registrar la causa']],
+  ['Diseño', 'Elige uno de los cinco escenarios y define qué tareas son críticas, su periodo y la latencia máxima tolerable. Justifica cada número.', ['Distingue tareas de seguridad, control y comunicación', 'Periodos coherentes con la física del proceso', 'Latencias justificadas por la consecuencia de llegar tarde']]
+];
+function buildQs() {
+  $('#qList').innerHTML = QS.map(([lvl, q, crit], i) => `<div class="q"><div class="qh"><span class="qn">P${i + 1}</span><div><div class="lvl">${lvl}</div><p>${esc(q)}</p></div></div>
+    <textarea id="bq${i}" aria-label="Respuesta a la pregunta ${i + 1}" placeholder="Escribe tu respuesta argumentada…">${esc(store('bp_q' + i) || '')}</textarea>
+    <details><summary>Criterios de una respuesta coherente</summary><ul>${crit.map(c => `<li>${esc(c)}</li>`).join('')}</ul></details></div>`).join('');
+  $$('#qList textarea').forEach((t, i) => t.addEventListener('input', () => store('bp_q' + i, t.value)));
+}
+$('#qCopy').onclick = () => {
+  const out = 'Buenas prácticas asyncio · Respuestas\n\n' + QS.map(([, q], i) => `P${i + 1}. ${q}\nR: ${$('#bq' + i).value || '(sin responder)'}\n`).join('\n');
+  try { navigator.clipboard.writeText(out).then(() => $('#qMsg').textContent = 'Respuestas copiadas.', () => $('#qMsg').textContent = 'No se pudo copiar: selecciona el texto manualmente.'); }
+  catch (e) { $('#qMsg').textContent = 'No se pudo copiar automáticamente.'; }
+};
+
+/* ============ arranque ============ */
+drawHeader(); buildPracs(); buildCheck(); buildQs(); buildTree();
+pracUi(); buildScenChips(); restart();
+$('#speedo').textContent = '1×';
+show((location.hash || '').slice(1) || 'simulador');
+requestAnimationFrame(frame);
+</script>
+
+</body></html>
